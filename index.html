@@ -64,18 +64,30 @@
      bool fund = true;
      for(int i = 0 ; i < ITERATIONS ; i++){
        fund = true;
-       if (pos.x < 0.){
-         pos *= vec2(-1, 1);
-         invCount++;
-	 fund = false;
-       }
-       if(pos.y < 0.){
-         pos *= vec2(1, -1);
+       // if (pos.x < 0.){
+       //   pos *= vec2(-1, 1);
+       //   invCount++;
+       //   fund = false;
+       // }
+       // if(pos.y < 0.){
+       //   pos *= vec2(1, -1);
+       //   invCount++;
+       //   fund = false;
+       // }
+       if(distance(pos, cPos) < r && pos.x > 0. && pos.y > 0.){
+         pos = circleInverse(pos, cPos, r);
          invCount++;
          fund = false;
-       }
-       if(distance(pos, cPos) < r ){
-         pos = circleInverse(pos, cPos, r);
+       }else if(distance(pos, -cPos) < r && pos.x < 0. && pos.y < 0.){
+         pos = circleInverse(pos, -cPos, r);
+         invCount++;
+         fund = false;
+       }else if(distance(pos, vec2(-cPos.x, cPos.y)) < r && pos.x < 0. && pos.y > 0.){
+         pos = circleInverse(pos, vec2(-cPos.x, cPos.y), r);
+         invCount++;
+         fund = false;
+       }else if(distance(pos, vec2(cPos.x, -cPos.y)) < r && pos.x > 0. && pos.y < 0.){
+         pos = circleInverse(pos, vec2(cPos.x, -cPos.y), r);
          invCount++;
          fund = false;
        }
@@ -101,12 +113,15 @@
      float ratio = iResolution.x / iResolution.y / 2.0;
      vec3 sum = vec3(0);
      calcCircle(PI/(4. + sin(iGlobalTime)), PI/8.);
+     vec2 translate = vec2(tp1.x, tp2.y);
+     vec2 tile = vec2(tp1.x, tp2.y) * 2.;
+
      for(float i = 0. ; i < sampleNum ; i++){
        vec2 position = ( (gl_FragCoord.xy + rand2n(gl_FragCoord.xy, i)) / iResolution.yy ) - vec2(ratio, 0.5);
 
        position = position * 2.;
        //position *= 1./ iGlobalTime;//0.03 + abs(1. * sin(iGlobalTime) * sin(iGlobalTime));
-       position *= 2. + abs(1. * sin(iGlobalTime) * sin(iGlobalTime));
+       //       position *= 2. + abs(1. * sin(iGlobalTime) * sin(iGlobalTime));
        position *= 1.0;
        //position +=vec2(1., 0.);// vec2(cos(iGlobalTime), 0.3 * sin(iGlobalTime));
 
@@ -115,12 +130,20 @@
        if(d == 0){
          sum += vec3(0.,0.,0.);
        }else{
-         sum += texture2D(texture, abs( vec2(0., 1.) - g_pos / vec2(tp1.x, tp2.y))).rgb;
+         if(distance(g_pos, cPos) - r < 0.01 ||
+            distance(g_pos, -cPos) - r < 0.01 ||
+            distance(g_pos, vec2(-cPos.x, cPos.y)) - r < 0.01 ||
+            distance(g_pos, vec2(cPos.x, -cPos.y)) - r < 0.01){
+              sum += vec3(1., 0, 0);
+            }else{
+              vec2 translate = vec2(tp1.x, tp2.y);
+              sum += texture2D(texture, abs( vec2(0., 1.) - (g_pos + translate) / tile)).rgb;
+            }
          // if(mod(float(d), 2.) == 0.){
-         //   sum += hsv2rgb(vec3(0.3, 1., 1.));
-         // }else{
-         //   sum += hsv2rgb(vec3(0.7, 1., 1.));
-         // }
+         //    sum += hsv2rgb(vec3(0.3, 1., 1.));
+         //  }else{
+         //    sum += hsv2rgb(vec3(0.7, 1., 1.));
+         //  }
        }
      }
      gl_FragColor = vec4(sum/sampleNum, 1.);
@@ -168,12 +191,15 @@
      // position *= 1./ iGlobalTime;//0.03 + abs(1. * sin(iGlobalTime) * sin(iGlobalTime));
      position *= 1.0;
      //position +=vec2(1., 0.);// vec2(cos(iGlobalTime), 0.3 * sin(iGlobalTime));
-     if(0. < position.x && position.x < tp1.x &&
-        0. < position.y && position.y < tp2.y){
-          gl_FragColor = texture2D(texture, abs( vec2(0., 1.) - position / vec2(tp1.x, tp2.y)));
+     vec2 translate = vec2(tp1.x, tp2.y);
+     position += translate;
+     vec2 tile = vec2(tp1.x, tp2.y) * 2.;
+     if(0. < position.x && position.x < tile.x &&
+        0. < position.y && position.y < tile.y ){
+          gl_FragColor = texture2D(texture, abs( vec2(0., 1.) - (position) / tile));
         }
-
    }
+
   </script>
 
   <style>
