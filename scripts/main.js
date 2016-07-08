@@ -1,4 +1,5 @@
 var g_canvas;
+var g_canvas2;
 var g_video;
 
 function setWebcam(){
@@ -41,13 +42,14 @@ function setWebcam(){
 
 window.addEventListener('load', function(event){
     g_canvas = document.getElementById('canvas');
+    g_canvas2 = document.getElementById('canvas2');
     setWebcam();
 }, false);
 
-function render(){
-    var gl = g_canvas.getContext('webgl') || g_canvas.getContext('experimental-webgl');
+function setupGL(canvas, fragId){
+    var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     var program = gl.createProgram();
-    attachShader(gl, 'fs', program, gl.FRAGMENT_SHADER);
+    attachShader(gl, fragId, program, gl.FRAGMENT_SHADER);
     attachShader(gl, 'vs', program, gl.VERTEX_SHADER);
     program = linkProgram(gl, program);
 
@@ -84,20 +86,32 @@ function render(){
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     gl.viewport(0, 0, g_canvas.width, g_canvas.height);
+    return [gl, uniLocation];
+}
+
+function render(){
+    var [gl, uniLocation] = setupGL(g_canvas, 'fs');
+    var [gl2, uniLocation2] = setupGL(g_canvas2, 'fs2');
+
     var startTime = new Date().getTime();
     (function(){
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);
-	gl.clearDepth(1.0);
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        var elapsedTime = new Date().getTime() - startTime;
 
-        gl.uniform2fv(uniLocation[1], [g_canvas.width, g_canvas.height]);
-        gl.uniform2fv(uniLocation[2], [g_video.videoWidth, g_video.videoHeight]);
-        gl.uniform1f(uniLocation[3], (new Date().getTime() - startTime) * 0.001);
+        function renderGL(gl, uniLocation, canvas){
+            gl.clearColor(0.0, 0.0, 0.0, 1.0);
+	    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, g_video);
-        gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+            gl.uniform2fv(uniLocation[1], [canvas.width, canvas.height]);
+            gl.uniform2fv(uniLocation[2], [g_video.videoWidth, g_video.videoHeight]);
+            gl.uniform1f(uniLocation[3], elapsedTime * 0.001);
 
-	gl.flush();
+	    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, g_video);
+            gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+
+	    gl.flush();
+        }
+        renderGL(gl, uniLocation, g_canvas);
+        renderGL(gl2, uniLocation2, g_canvas2);
 
 	requestAnimationFrame(arguments.callee);
     })();
