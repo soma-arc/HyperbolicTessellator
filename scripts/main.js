@@ -53,7 +53,9 @@ function render(){
 
     var uniLocation = new Array();
     uniLocation[0] = gl.getUniformLocation(program, 'texture');
-
+    uniLocation[1] = gl.getUniformLocation(program, 'iResolution');
+    uniLocation[2] = gl.getUniformLocation(program, 'camResolution');
+    uniLocation[3] = gl.getUniformLocation(program, 'iGlobalTime');
     var position = [-1.0, 1.0, 0.0,
                     1.0, 1.0, 0.0,
 	            -1.0, -1.0,  0.0,
@@ -82,10 +84,15 @@ function render(){
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     gl.viewport(0, 0, g_canvas.width, g_canvas.height);
+    var startTime = new Date().getTime();
     (function(){
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.clearDepth(1.0);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        gl.uniform2fv(uniLocation[1], [g_canvas.width, g_canvas.height]);
+        gl.uniform2fv(uniLocation[2], [g_video.videoWidth, g_video.videoHeight]);
+        gl.uniform1f(uniLocation[3], (new Date().getTime() - startTime) * 0.001);
 
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, g_video);
         gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
