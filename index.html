@@ -27,37 +27,103 @@
                  fract(cos(dot(seed.xy ,vec2(4.898,7.23))) * 23421.631));
    }
 
-   const float sampleNum = 50.;
-   const float PI = 3.141592653589;
-   void main(){
-     float ratio = iResolution.x / iResolution.y / 2.0;
+   vec2 tp1 = vec2(0.26607724, 0);
+   vec2 tp2 = vec2(0, 0.14062592);
+   vec2 cPos = vec2(2.01219217, 3.62584500);
+   float r = 4.02438434;
+   const float PI = 3.14159265359;
 
-     vec3 sum = vec3(0.);
-     float theta = PI / 4. + PI/6. * sin(iGlobalTime);
-     float xc = 50. * 2. * cos(theta);
-     float yc = 50. * 2. * sin(theta);
-     vec2 tileSize = vec2(xc, yc);
-     for(float i = 0. ; i < sampleNum ; i++){
-       vec2 position = ( (gl_FragCoord.xy + rand2n(gl_FragCoord.xy, i)) / iResolution.yy ) - vec2(ratio, 0.5);
-       position *= 100.;
+   void calcCircle(float theta, float phi){
+     float tanTheta = tan(PI/2. - theta);
+     float tanPhi = tan(phi);
+     float tanTheta2 = tanTheta * tanTheta;
+     float tanPhi2 = tanPhi * tanPhi;
 
-       vec2 p = position - tileSize * floor(position / tileSize) - tileSize / 2.;
-       float angle = atan(p.y, p.x);
+     tp1 = vec2(sqrt((1. + tanTheta2)/(-tanPhi2 + tanTheta2)) -
+                tanTheta * sqrt((1. + tanPhi2)/(-tanPhi2 + tanTheta2))/tanTheta, 0.);
+     tp2 = vec2(0., -tanPhi * sqrt(-(1. + tanTheta2)/(tanPhi2 - tanTheta2))+
+                                                      tanTheta * sqrt(-(1. + tanPhi2)/(tanPhi2 - tanTheta2)));
 
-       if(mod(floor(angle / (PI/2.0)), 2.0) == 0. ){
-         if(mod(angle, PI/2.0) < theta){
-           sum += vec3(1) * texture2D(texture, abs(vec2(1.,1.)-(p + tileSize / 2.) / tileSize )).rgb;
-         }else{
-           sum += vec3(1) * texture2D(texture, abs(vec2(0.,0.)-(p + tileSize / 2.) / tileSize )).rgb;
-         }
-       }else{
-    	 if(mod(angle, PI/2.0) < PI / 2.0 - theta){
-           sum += vec3(1) * texture2D(texture, abs(vec2(0.,1.)-(p + tileSize / 2.) / tileSize )).rgb;
-         }else{
-           sum += vec3(1) * texture2D(texture, abs(vec2(1.,0.)-(p + tileSize / 2.) / tileSize )).rgb;
-         }
+
+     cPos = vec2(sqrt((1. + tanTheta2)/(-tanPhi2 + tanTheta2)),
+                 sqrt((1. + tanPhi2)*tanTheta2/(-tanPhi2 + tanTheta2)));
+     r = sqrt((1. + tanPhi2)*(1. + tanTheta2) /(-tanPhi2 + tanTheta2));
+   }
+
+   vec2 circleInverse(vec2 pos, vec2 circlePos, float circleR){
+     return ((pos - circlePos) * circleR * circleR)/(length(pos - circlePos) * length(pos - circlePos) ) + circlePos;
+   }
+
+   const int ITERATIONS = 50;
+   float loopNum = 0.;
+   vec2 g_pos;
+   int IIS(vec2 pos){
+     if(length(pos) > 1.) return 0;
+
+     int invCount = 1;
+     bool fund = true;
+     for(int i = 0 ; i < ITERATIONS ; i++){
+       fund = true;
+       if (pos.x < 0.){
+         pos *= vec2(-1, 1);
+         invCount++;
+	 fund = false;
+       }
+       if(pos.y < 0.){
+         pos *= vec2(1, -1);
+         invCount++;
+         fund = false;
+       }
+       if(distance(pos, cPos) < r ){
+         pos = circleInverse(pos, cPos, r);
+         invCount++;
+         fund = false;
+       }
+       if(fund){
+         g_pos = pos;
+         return invCount;
        }
      }
+
+     g_pos = pos;
+     return invCount;
+   }
+
+   vec3 hsv2rgb(vec3 c)
+   {
+     vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+     vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+     return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+   }
+
+   const float sampleNum = 50.;
+   void main(){
+     float ratio = iResolution.x / iResolution.y / 2.0;
+     vec3 sum = vec3(0);
+     calcCircle(PI/(4. + sin(iGlobalTime)), PI/8.);
+     for(float i = 0. ; i < sampleNum ; i++){
+       vec2 position = ( (gl_FragCoord.xy + rand2n(gl_FragCoord.xy, i)) / iResolution.yy ) - vec2(ratio, 0.5);
+
+       position = position * 2.;
+      // position *= 1./ iGlobalTime;//0.03 + abs(1. * sin(iGlobalTime) * sin(iGlobalTime));
+       position *= 1.0;
+       //position +=vec2(1., 0.);// vec2(cos(iGlobalTime), 0.3 * sin(iGlobalTime));
+
+       int d = IIS(position);
+
+       if(d == 0){
+         sum += vec3(0.,0.,0.);
+       }else{
+         sum += texture2D(texture, abs( vec2(0., 1.) - g_pos / vec2(tp1.x, tp2.y))).rgb;
+         // if(mod(float(d), 2.) == 0.){
+         //   sum += hsv2rgb(vec3(0.3, 1., 1.));
+         // }else{
+         //   sum += hsv2rgb(vec3(0.7, 1., 1.));
+         // }
+       }
+     }
+     gl_FragColor = vec4(sum/sampleNum, 1.);
+   }
 
      gl_FragColor = vec4(sum / sampleNum,1.);
    }
