@@ -1,6 +1,7 @@
 var g_canvas;
 var g_canvas2;
 var g_video;
+var debug = false;
 
 function setWebcam(){
     navigator.getUserMedia = (
@@ -43,8 +44,25 @@ function setWebcam(){
 window.addEventListener('load', function(event){
     g_canvas = document.getElementById('canvas');
     g_canvas2 = document.getElementById('canvas2');
+    if(!debug){
+        resizeCanvasFullscreen();
+    }
     setWebcam();
 }, false);
+
+window.addEventListener('resize', function(event){
+    if(!debug){
+        resizeCanvasFullscreen();
+    }
+}, false);
+
+function resizeCanvasFullscreen(){
+    g_canvas.style.width = window.innerWidth + 'px';
+    g_canvas.style.height = window.innerHeight + 'px';
+    g_canvas.width = window.innerWidth * window.devicePixelRatio;
+    g_canvas.height = window.innerHeight * window.devicePixelRatio;
+}
+
 
 function setupGL(canvas, fragId){
     var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
@@ -85,19 +103,21 @@ function setupGL(canvas, fragId){
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-    gl.viewport(0, 0, g_canvas.width, g_canvas.height);
     return [gl, uniLocation];
 }
 
 function render(){
-    var [gl, uniLocation] = setupGL(g_canvas, 'fs');
-    var [gl2, uniLocation2] = setupGL(g_canvas2, 'fs2');
+    var [gl, uniLocation] = setupGL(g_canvas, 'fs3');
+    if(debug){
+        var [gl2, uniLocation2] = setupGL(g_canvas2, 'fs4');
+    }
 
     var startTime = new Date().getTime();
     (function(){
         var elapsedTime = new Date().getTime() - startTime;
 
         function renderGL(gl, uniLocation, canvas){
+            gl.viewport(0, 0, g_canvas.width, g_canvas.height);
             gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -111,7 +131,9 @@ function render(){
 	    gl.flush();
         }
         renderGL(gl, uniLocation, g_canvas);
-        renderGL(gl2, uniLocation2, g_canvas2);
+        if(debug){
+            renderGL(gl2, uniLocation2, g_canvas2);
+        }
 
 	requestAnimationFrame(arguments.callee);
     })();
