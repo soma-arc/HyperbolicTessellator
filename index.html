@@ -135,15 +135,15 @@
        if(d == 0){
          sum += vec3(0.,0.,0.);
        }else{
-         if(distance(g_pos, cPos) - r < 0.01 ||
-            distance(g_pos, -cPos) - r < 0.01 ||
-            distance(g_pos, vec2(-cPos.x, cPos.y)) - r < 0.01 ||
-            distance(g_pos, vec2(cPos.x, -cPos.y)) - r < 0.01){
-              sum += vec3(1., 0, 0);
-            }else{
+         // if(distance(g_pos, cPos) - r < 0.01 ||
+         //    distance(g_pos, -cPos) - r < 0.01 ||
+         //    distance(g_pos, vec2(-cPos.x, cPos.y)) - r < 0.01 ||
+         //    distance(g_pos, vec2(cPos.x, -cPos.y)) - r < 0.01){
+         //      sum += vec3(1., 0, 0);
+         //    }else{
               vec2 translate = vec2(tp1.x, tp2.y);
-              sum += texture2D(texture, abs( vec2(0., 1.) - (g_pos + translate) / tile)).rgb;
-            }
+              sum += texture2D(texture, abs( vec2(1.) - (g_pos + translate) / tile)).rgb;
+//            }
          // if(mod(float(d), 2.) == 0.){
          //    sum += hsv2rgb(vec3(0.3, 1., 1.));
          //  }else{
