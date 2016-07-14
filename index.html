@@ -239,7 +239,19 @@
      return vec2(pos.x / (1. - pos.z), pos.y / (1. - pos.z));
    }
 
-   float ly;
+   vec4 circleIntersection(vec2 cPos1, float r1, vec2 cPos2, float r2){
+     float x = cPos1.x - cPos2.x;
+     float y = cPos1.y - cPos2.y;
+     float x2 = x * x;
+     float y2 = y * y;
+     float x2y2 = x2 + y2;
+     float a = (x2y2 + r2 * r2 - r1 * r1) / 2.;
+     float a2 = a * a;
+     float numR = sqrt(x2y2 * r2 * r2 - a2);
+     return vec4((a * x + y * numR) / x2y2 + cPos2.x, (a * y - x * numR) / x2y2 + cPos2.y,
+                 (a * x - y * numR) / x2y2 + cPos2.x, (a * y + x * numR) / x2y2 + cPos2.y);
+   }
+
    vec3 stereoProject(vec2 pos){
      float x = pos.x;
      float y = pos.y;
@@ -268,16 +280,16 @@
      int invCount = 1;
      for(int i = 0 ; i < ITERATIONS ; i++){
        fund = true;
-       if (pos.x < 0.){
-         pos *= vec2(-1, 1);
-         invCount++;
-         fund = false;
-       }
-       if(pos.y < 0.){
-         pos *= vec2(1, -1);
-         invCount++;
-         fund = false;
-       }
+       // if (pos.x < 0.){
+       //   pos *= vec2(-1, 1);
+       //   invCount++;
+       //   fund = false;
+       // }
+       // if(pos.y < 0.){
+       //   pos *= vec2(1, -1);
+       //   invCount++;
+       //   fund = false;
+       // }
        if(revCircle){
          if(distance(pos, cPos1) > cr1 ){
            pos = circleInverse(pos, cPos1, cr1);
@@ -285,12 +297,12 @@
            colCount++;
            fund = false;
          }
-         // if(distance(pos, -cPos1) > cr1 ){
-         //   pos = circleInverse(pos, -cPos1, cr1);
-         //   invCount++;
-         //   colCount++;
-         //   fund = false;
-         // }
+          if(distance(pos, -cPos1) > cr1 ){
+            pos = circleInverse(pos, -cPos1, cr1);
+            invCount++;
+            colCount++;
+            fund = false;
+          }
        }else{
          if(distance(pos, cPos1) < cr1 ){
            pos = circleInverse(pos, cPos1, cr1);
@@ -298,12 +310,12 @@
            colCount++;
            fund = false;
          }
-         // if(distance(pos, -cPos1) < cr1 ){
-         //    pos = circleInverse(pos, -cPos1, cr1);
-         //    invCount++;
-         //    colCount++;
-         //    fund = false;
-         //  }
+         if(distance(pos, -cPos1) < cr1 ){
+            pos = circleInverse(pos, -cPos1, cr1);
+            invCount++;
+            colCount++;
+            fund = false;
+          }
        }
 
        if(revCircle2){
@@ -313,12 +325,12 @@
            colCount++;
            fund = false;
          }
-         // if(distance(pos, -cPos2) > cr2 ){
-         //   pos = circleInverse(pos, -cPos2, cr2);
-         //   invCount++;
-         //   colCount++;
-         //   fund = false;
-         // }
+          if(distance(pos, -cPos2) > cr2 ){
+            pos = circleInverse(pos, -cPos2, cr2);
+            invCount++;
+            colCount++;
+            fund = false;
+          }
        }else{
          if(distance(pos, cPos2) < cr2 ){
            pos = circleInverse(pos, cPos2, cr2);
@@ -326,12 +338,12 @@
            colCount++;
            fund = false;
          }
-                                     // if(distance(pos, -cPos2) < cr2 ){
-         //   pos = circleInverse(pos, -cPos2, cr2);
-         //   invCount++;
-         //   colCount++;
-         //   fund = false;
-         // }
+         if(distance(pos, -cPos2) < cr2 ){
+            pos = circleInverse(pos, -cPos2, cr2);
+            invCount++;
+            colCount++;
+            fund = false;
+          }
        }
 
        if(fund){
@@ -372,7 +384,7 @@
      return vec3(pos, distance(pos, line.xy));
    }
 
-   const float sampleNum = 30.;
+   const float sampleNum = 10.;
    void main( ){
 
      float t = mod(iGlobalTime, 10.);
@@ -407,8 +419,17 @@
        revCircle2 = true;
      }
 
-     vec2 translate = vec2(0, 0);
-     vec2 tile = vec2(x, y) * 1.;
+     vec4 intersection = circleIntersection(cPos1, cr1, cPos2, cr2);
+     vec2 p1 = intersection.xy;
+     vec2 p2 = intersection.zw;
+
+     vec2 corner = p2;
+
+     if(revCircle){
+       corner = p1;
+     }
+     vec2 translate = corner;
+     vec2 tile = corner * 2.;
      for(float i = 0. ; i < sampleNum ; i++){
        vec2 position = ( (gl_FragCoord.xy + rand2n(gl_FragCoord.xy, i)) / iResolution.yy ) - vec2(ratio, 0.5);
 
@@ -420,7 +441,7 @@
        if(d == 0){
          sum += vec3(0.,0.,0.);
        }else{
-         sum += texture2D(texture, abs( vec2(0., 1.) - (g_pos + translate) / tile)).rgb;
+         sum += texture2D(texture, abs( vec2( 1.) - (g_pos + translate) / tile)).rgb;
          continue;
          // if(mod(float(d), 2.) == 0.){
          //   if(outer){
