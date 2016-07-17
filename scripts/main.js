@@ -1,7 +1,64 @@
 var g_canvas;
 var g_canvas2;
 var g_video;
-var debug = false;
+var g_debug = false;
+
+var g_midi;
+var g_tiltX = 0;
+var g_tiltY = 0;
+var g_scale = 2.;
+var g_translate = [0, 0];
+
+var KorgNanoKontrol = new Object();
+KorgNanoKontrol.knob = new Object();
+KorgNanoKontrol.slider = new Object();
+KorgNanoKontrol.buttonS = new Object();
+KorgNanoKontrol.buttonM = new Object();
+KorgNanoKontrol.buttonR = new Object();
+KorgNanoKontrol.controlListeners = new Object();
+for(var i = 0 ; i < 8 ; i++){
+    KorgNanoKontrol.slider[i] = i;
+    KorgNanoKontrol.knob[i] = 16 + i;
+    KorgNanoKontrol.buttonS[i] = 33 + i;
+    KorgNanoKontrol.buttonM[i] = 48 + i;
+    KorgNanoKontrol.buttonR[i] = 64 + i;
+}
+
+KorgNanoKontrol.addControlListaner = function(inputId, listener){
+    KorgNanoKontrol.controlListeners[inputId] = listener;
+}
+KorgNanoKontrol.onMidiMessage = function(inputId, value){
+    if(KorgNanoKontrol.controlListeners[inputId] != undefined)
+        KorgNanoKontrol.controlListeners[inputId](value);
+}
+
+function success(midiAccess){
+    g_midi = midiAccess;
+    console.log("MIDI SUCCESS");
+    setInputs(midiAccess);
+}
+
+function failure(msg){
+    console.log("MIDI FAILED - " + msg);
+}
+
+function setInputs(midiAccess){
+    var inputs = midiAccess.inputs;
+    inputs.forEach(function(key, port){
+        console.log("[" + key.state + "] manufacturer:" + key.manufacturer + " / name:" + key.name + " / port:" + port);
+        key.onmidimessage = onMidiMessage;
+    });
+}
+
+function onMidiMessage(event){
+    console.log(event);
+    var str = '';
+    for (var i = 0; i < event.data.length; i++) {
+        str += event.data[i] + ':';
+    }
+    console.log(str);
+    KorgNanoKontrol.onMidiMessage(event.data[1], event.data[2]);
+}
 
 function setWebcam(){
     navigator.getUserMedia = (
@@ -42,16 +99,38 @@ function setWebcam(){
 }
 
 window.addEventListener('load', function(event){
+    var i = 0;
+    KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
+                                       function(value){
+                                           g_tiltX = (value) / 127 * Math.PI / 2.;
+                                       });
+    // KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
+    //                                    function(value){
+    //                                        g_tiltY = (value - 64) / 64 * Math.PI / 2.;
+    //                                    });
+    KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
+                                       function(value){
+                                           g_scale = 2. + value / 30;
+                                       });
+    KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
+                                       function(value){
+                                           g_translate[0] = (value - 64) / 64;
+                                       });
+    KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
+                                       function(value){
+                                           g_translate[1] = (value - 64) / 64;
+                                       });
+    navigator.requestMIDIAccess().then(success, failure)
     g_canvas = document.getElementById('canvas');
     g_canvas2 = document.getElementById('canvas2');
-    if(!debug){
+    if(!g_debug){
         resizeCanvasFullscreen();
     }
     setWebcam();
 }, false);
 
 window.addEventListener('resize', function(event){
-    if(!debug){
+    if(!g_debug){
         resizeCanvasFullscreen();
     }
 }, false);
@@ -76,6 +155,10 @@ function setupGL(canvas, fragId){
     uniLocation[1] = gl.getUniformLocation(program, 'iResolution');
     uniLocation[2] = gl.getUniformLocation(program, 'camResolution');
     uniLocation[3] = gl.getUniformLocation(program, 'iGlobalTime');
+    uniLocation[4] = gl.getUniformLocation(program, 'tilt');
+    uniLocation[5] = gl.getUniformLocation(program, 'scale');
+    uniLocation[6] = gl.getUniformLocation(program, 'translate');
+
     var position = [-1.0, 1.0, 0.0,
                     1.0, 1.0, 0.0,
 	            -1.0, -1.0,  0.0,
@@ -108,7 +191,7 @@ function setupGL(canvas, fragId){
 
 function render(){
     var [gl, uniLocation] = setupGL(g_canvas, 'fs3');
-    if(debug){
+    if(g_debug){
         var [gl2, uniLocation2] = setupGL(g_canvas2, 'fs4');
     }
 
@@ -124,6 +207,9 @@ function render(){
             gl.uniform2fv(uniLocation[1], [canvas.width, canvas.height]);
             gl.uniform2fv(uniLocation[2], [g_video.videoWidth, g_video.videoHeight]);
             gl.uniform1f(uniLocation[3], elapsedTime * 0.001);
+            gl.uniform2fv(uniLocation[4], [g_tiltX, g_tiltY]);
+            gl.uniform1f(uniLocation[5], g_scale);
+            gl.uniform2fv(uniLocation[6], g_translate);
 
 	    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, g_video);
             gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
@@ -131,7 +217,7 @@ function render(){
 	    gl.flush();
         }
         renderGL(gl, uniLocation, g_canvas);
-        if(debug){
+        if(g_debug){
             renderGL(gl2, uniLocation2, g_canvas2);
         }
 
