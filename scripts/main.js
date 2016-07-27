@@ -15,6 +15,7 @@ KorgNanoKontrol.slider = new Object();
 KorgNanoKontrol.buttonS = new Object();
 KorgNanoKontrol.buttonM = new Object();
 KorgNanoKontrol.buttonR = new Object();
+KorgNanoKontrol.buttonCycle = 46;
 KorgNanoKontrol.controlListeners = new Object();
 for(var i = 0 ; i < 8 ; i++){
     KorgNanoKontrol.slider[i] = i;
@@ -104,21 +105,25 @@ window.addEventListener('load', function(event){
                                        function(value){
                                            g_tiltX = (value) / 127 * Math.PI / 2.;
                                        });
-    // KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
-    //                                    function(value){
-    //                                        g_tiltY = (value - 64) / 64 * Math.PI / 2.;
-    //                                    });
+     KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
+                                        function(value){
+                                            g_tiltY = (value - 64) / 64 * Math.PI / 5.5;
+                                        });
     KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
                                        function(value){
-                                           g_scale = 2. + value / 30;
+                                           g_scale = .1 + value / 10;
                                        });
     KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
                                        function(value){
-                                           g_translate[0] = (value - 64) / 64;
+                                           g_translate[0] = (value - 64) / 16;
                                        });
     KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
                                        function(value){
-                                           g_translate[1] = (value - 64) / 64;
+                                           g_translate[1] = (value - 64) / 16;
+                                       });
+    KorgNanoKontrol.addControlListaner(KorgNanoKontrol.buttonCycle,
+                                       function(value){
+                                           location.reload();
                                        });
     navigator.requestMIDIAccess().then(success, failure)
     g_canvas = document.getElementById('canvas');
@@ -134,6 +139,23 @@ window.addEventListener('resize', function(event){
         resizeCanvasFullscreen();
     }
 }, false);
+
+/*
+var g_scaleFactor = 0.1;
+window.onmousewheel = function(event){
+    if(event.wheelDelta < 0.){
+        if((g_scale + g_scaleFactor) / 10 > g_scale / 10){
+            g_scaleFactor *= 10;
+        }
+        g_scale += g_scaleFactor;
+    }else{
+        if(g_scale - g_scaleFactor <= 0.){
+            g_scaleFactor /= 10;
+        }
+        g_scale -= g_scaleFactor;
+    }
+}
+*/
 
 function resizeCanvasFullscreen(){
     g_canvas.style.width = window.innerWidth + 'px';

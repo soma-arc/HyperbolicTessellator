@@ -278,7 +278,7 @@
 
    bool revCircle = false;
    bool revCircle2 = false;
-   const int ITERATIONS = 50;
+   const int ITERATIONS = 100;
    float colCount = 0.;
    bool outer = false;
    int IIS(vec2 pos){
@@ -393,7 +393,7 @@
      return vec3(pos, distance(pos, line.xy));
    }
 
-   const float sampleNum = 10.;
+   const float sampleNum = 5.;
    void main( ){
 
      float t = mod(iGlobalTime, 10.);
@@ -407,7 +407,7 @@
      mat3 xRotate = mat3(1, 0, 0,
                          0, cos(bendX), -sin(bendX),
                          0, sin(bendX), cos(bendX));
-     float bendY = 0.;//tilt.y;
+     float bendY = tilt.y;
 //     float bendY = PI/6.5;//-abs(0.8 * sin(iGlobalTime));
      mat3 yRotate = mat3(cos(bendY), 0, sin(bendY),
                          0, 1, 0,
