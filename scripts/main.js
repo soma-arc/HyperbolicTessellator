@@ -1,7 +1,5 @@
 var g_canvas;
-var g_canvas2;
 var g_video;
-var g_debug = false;
 
 var g_midi;
 var g_tiltX = 0;
@@ -122,17 +120,12 @@ window.addEventListener('load', function(event){
                                        });
     navigator.requestMIDIAccess().then(success, failure)
     g_canvas = document.getElementById('canvas');
-    g_canvas2 = document.getElementById('canvas2');
-    if(!g_debug){
-        resizeCanvasFullscreen();
-    }
+    resizeCanvasFullscreen();
     setWebcam();
 }, false);
 
 window.addEventListener('resize', function(event){
-    if(!g_debug){
-        resizeCanvasFullscreen();
-    }
+    resizeCanvasFullscreen();
 }, false);
 
 function resizeCanvasFullscreen(){
@@ -191,9 +184,6 @@ function setupGL(canvas, fragId){
 
 function render(){
     var [gl, uniLocation] = setupGL(g_canvas, 'fs3');
-    if(g_debug){
-        var [gl2, uniLocation2] = setupGL(g_canvas2, 'fs4');
-    }
 
     var startTime = new Date().getTime();
     (function(){
@@ -217,9 +207,6 @@ function render(){
 	    gl.flush();
         }
         renderGL(gl, uniLocation, g_canvas);
-        if(g_debug){
-            renderGL(gl2, uniLocation2, g_canvas2);
-        }
 
 	requestAnimationFrame(arguments.callee);
     })();
