@@ -73,7 +73,8 @@ function setWebcam(){
 	    function(localMediaStream){
 		var url = (
 		    window.URL ||
-			window.webkitURL
+			window.webkitURL ||
+			window.mozURL
 		);
 		g_video = document.createElement('video');
 		g_video.addEventListener('canplay', function(){
@@ -131,6 +132,30 @@ window.addEventListener('load', function(event){
 
 window.addEventListener('resize', function(event){
     resizeCanvasFullscreen();
+}, false);
+
+window.addEventListener('keydown', function(event){
+   if(event.key == 'ArrowRight'){
+	g_tiltX += 0.05;
+    }else if(event.key == 'ArrowLeft'){
+	g_tiltX -= 0.05;
+    }else if(event.key == 'ArrowUp'){
+	g_tiltY += 0.05;
+    }else if(event.key == 'ArrowDown'){
+	g_tiltY -= 0.05;
+    }else if(event.key == 'n'){
+	g_scale += 0.05;
+    }else if(event.key == 'p'){
+	g_scale -= 0.05;
+    }else if(event.key == 'w'){
+	g_translate[1] -= 0.1;
+    }else if(event.key == 's'){
+	g_translate[1] += 0.1;
+    }else if(event.key == 'a'){
+	g_translate[0] -= 0.1;
+    }else if(event.key == 'd'){
+	g_translate[0] += 0.1;
+    }
 }, false);
 
 /*
@@ -205,7 +230,7 @@ function setupGL(canvas, fragId){
 }
 
 function render(){
-    var [gl, uniLocation] = setupGL(g_canvas, 'fs3');
+    var [gl, uniLocation] = setupGL(g_canvas, 'hyperbolic-tessellator');
 
     var startTime = new Date().getTime();
     (function(){
