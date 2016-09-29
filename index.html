@@ -38,6 +38,9 @@
    uniform float hueStep;
    uniform int maxIterations;
 
+   uniform sampler2D tex2;
+   uniform vec2 lgtmTranslate;
+
    vec2 rand2n(vec2 co, float sampleIndex) {
        vec2 seed = co * (sampleIndex + 1.0);
        seed+=vec2(-1,1);
@@ -285,6 +288,7 @@
 	   //   sum += vec3(0., 1.,1.);
 	   //   continue;
 	   // }
+	   vec3 video;
 	   if(d == 0){
                sum += vec3(0.,0.,0.);
 	   }else{
@@ -293,13 +297,34 @@
 		   if(abs(distance(g_pos, cPos1) - cr1) < 0.01 ||
 		      abs(distance(g_pos, cPos2) - cr2) < 0.01 ||
 		      abs(distance(g_pos, -cPos1) - cr1) < 0.01 ||
-		      abs(distance(g_pos, -cPos2) - cr2) < 0.01){
+ 		      abs(distance(g_pos, -cPos2) - cr2) < 0.01){
                        sum += vec3(0, 0, 0);
 		   }else{
-                       ss = texture2D(texture, abs( vec2( 1.) - (g_pos + texTranslate) / tile)).rgb;
+		       if(mod(float(d), 2.) == 1.)
+			   ss = texture2D(tex2, abs( vec2( 0., 1.) - (g_pos + texTranslate + lgtmTranslate) / tile)).rgb;
+		       else
+			   ss = texture2D(tex2, abs( vec2( 1., 1.) - (g_pos + texTranslate + lgtmTranslate) / tile)).rgb;
+
+		       if(ss.x == 0.0 && ss.y == 0.0 && ss.z == 0.0){
+			   /* if(mod(float(d), 2.) == 1.)
+			      ss = texture2D(texture, abs( vec2( 0., 1.) - (g_pos + texTranslate) / tile)).rgb;
+			      else*/
+			       ss = texture2D(texture, abs( vec2( 1.) - (g_pos + texTranslate) / tile)).rgb;
+		       }
 		   }
                }else{
-		   ss = texture2D(texture, abs( vec2( 1.) - (g_pos + texTranslate) / tile)).rgb;
+		   if(mod(float(d), 2.) == 1.)
+		       ss = texture2D(tex2, abs( vec2( 0., 1.) - (g_pos + texTranslate + lgtmTranslate) / tile)).rgb;
+		   else
+		       ss = texture2D(tex2, abs( vec2( 1., 1.) - (g_pos + texTranslate + lgtmTranslate) / tile)).rgb;
+
+		   if(ss.x == 0. && ss.y == 0.0 && ss.z == 0.0){
+		       /* if(mod(float(d), 2.) == 1.)
+			  ss = texture2D(texture, abs( vec2( 0., 1.) - (g_pos + texTranslate) / tile)).rgb;
+			  else*/
+			   ss = texture2D(texture, abs( vec2( 1.) - (g_pos + texTranslate) / tile)).rgb;
+		   }
+
                }
                //continue;
                vec3 ss2;

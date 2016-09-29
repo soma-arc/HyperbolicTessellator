@@ -155,6 +155,14 @@ window.addEventListener('keydown', function(event){
 	g_translate[0] -= 0.1;
     }else if(event.key == 'd'){
 	g_translate[0] += 0.1;
+    }else if(event.key == 'i'){
+	g_lgtmTranslate[1] -= 0.1;
+    }else if(event.key == 'k'){
+	g_lgtmTranslate[1] += 0.1;
+    }else if(event.key == 'j'){
+	g_lgtmTranslate[0] += 0.1;
+    }else if(event.key == 'l'){
+	g_lgtmTranslate[0] -= 0.1;
     }
 }, false);
 
@@ -182,14 +190,15 @@ function resizeCanvasFullscreen(){
     g_canvas.height = window.innerHeight * window.devicePixelRatio;
 }
 
-
+var g_videoTexture;
+var g_lgtmTranslate = [0, 0.2];
 function setupGL(canvas, fragId){
     var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     var program = gl.createProgram();
     attachShader(gl, fragId, program, gl.FRAGMENT_SHADER);
     attachShader(gl, 'vs', program, gl.VERTEX_SHADER);
     program = linkProgram(gl, program);
-
+	
     var uniLocation = new Array();
     uniLocation[0] = gl.getUniformLocation(program, 'texture');
     uniLocation[1] = gl.getUniformLocation(program, 'iResolution');
@@ -198,6 +207,8 @@ function setupGL(canvas, fragId){
     uniLocation[4] = gl.getUniformLocation(program, 'tilt');
     uniLocation[5] = gl.getUniformLocation(program, 'scale');
     uniLocation[6] = gl.getUniformLocation(program, 'translate');
+    uniLocation[7] = gl.getUniformLocation(program, 'tex2');
+    uniLocation[8] = gl.getUniformLocation(program, 'lgtmTranslate');
 
     var position = [-1.0, 1.0, 0.0,
                     1.0, 1.0, 0.0,
@@ -216,10 +227,10 @@ function setupGL(canvas, fragId){
     gl.vertexAttribPointer(vAttLocation, 3, gl.FLOAT, false, 0, 0);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, vIndex);
 
-    var videoTexture = gl.createTexture(gl.TEXTURE_2D);
+    g_videoTexture = gl.createTexture(gl.TEXTURE_2D);
 
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, videoTexture);
+    gl.bindTexture(gl.TEXTURE_2D, g_videoTexture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, g_video);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -232,15 +243,35 @@ function setupGL(canvas, fragId){
 function render(){
     var [gl, uniLocation] = setupGL(g_canvas, 'hyperbolic-tessellator');
 
+    var texture1 = gl.createTexture(gl.TEXTURE_2D);
+
+    var lgtm = new Image();
+    lgtm.onload = function(){
+	gl.activeTexture(gl.TEXTURE1);
+	gl.bindTexture(gl.TEXTURE_2D, texture1);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, lgtm);
+	gl.generateMipmap(gl.TEXTURE_2D);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    };
+    lgtm.src = "img/LGTM.png";
+    
     var startTime = new Date().getTime();
     (function(){
         var elapsedTime = new Date().getTime() - startTime;
-
+	g_tiltX = Math.abs(Math.sin(elapsedTime/ 500.));
+	g_lgtmTranslate[1] = .8 * Math.abs(Math.sin(elapsedTime/ 500.));
         function renderGL(gl, uniLocation, canvas){
             gl.viewport(0, 0, g_canvas.width, g_canvas.height);
             gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+	    gl.activeTexture(gl.TEXTURE0);
+	    gl.bindTexture(gl.TEXTURE_2D, g_videoTexture);
+	    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, g_video);
+	    gl.uniform1i(uniLocation[0], 0);
             gl.uniform2fv(uniLocation[1], [canvas.width, canvas.height]);
             gl.uniform2fv(uniLocation[2], [g_video.videoWidth, g_video.videoHeight]);
             gl.uniform1f(uniLocation[3], elapsedTime * 0.001);
@@ -248,7 +279,11 @@ function render(){
             gl.uniform1f(uniLocation[5], g_scale);
             gl.uniform2fv(uniLocation[6], g_translate);
 
-	    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, g_video);
+	    gl.activeTexture(gl.TEXTURE1);
+	    gl.bindTexture(gl.TEXTURE_2D, texture1);
+	    gl.uniform1i(uniLocation[7], 1);
+	    gl.uniform2fv(uniLocation[8], g_lgtmTranslate);
+
             gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 
 	    gl.flush();
