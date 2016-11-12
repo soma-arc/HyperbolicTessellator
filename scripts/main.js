@@ -1,158 +1,192 @@
-var g_canvas;
-var g_video;
+var HyperbolicTessellator = function(){
+    this.fragId = 'hyperbolic-tessellator';
+    this.vertId = 'vs';
+    this.tilt = [0, 0];
+}
 
-var g_tiltX = 0;
-var g_tiltY = 0;
-var g_scale = 2.;
-var g_translate = [0, 0];
-
-function setWebcam(){
-    navigator.getUserMedia = (
-	navigator.getUserMedia ||
-	    navigator.webkitGetUserMedia ||
-	    navigator.mozGetUserMedia
-    );
-
-    if(navigator.getUserMedia){
-	navigator.getUserMedia(
-	    {video: true,
-	     audio: false},
-	    function(localMediaStream){
-		var url = (
-		    window.URL ||
-			window.webkitURL ||
-			window.mozURL
-		);
-		g_video = document.createElement('video');
-		g_video.addEventListener('canplay', function(){
-		    g_video.removeEventListener('canplay', arguments.callee, true);
-		    g_video.play();
-		    render();
-		}, true);
-
-		g_video.src = url.createObjectURL(localMediaStream);
-	    },
-	    function(err){
-		if(err.name === 'PermissionDeniedError'){
-		    alert('denied permission');
-		}else{
-		    alert('can not be used webcam');
-		}
-	    }
-	);
-    }else{
-	alert('not supported getUserMedia');
+HyperbolicTessellator.prototype = {
+    setUniformLocation: function(uniLocation, gl, program){
+        uniLocation.push(gl.getUniformLocation(program, 'u_tilt'));
+    },
+    setUniformValues: function(uniLocation, gl, uniI){
+        gl.uniform2fv(uniLocation[uniI++], this.tilt);
+        return uniI;
     }
 }
 
-window.addEventListener('resize', function(event){
-    resizeCanvasFullscreen();
-}, false);
+var RenderCanvas = function(canvasId){
+    this.canvasId = canvasId;
+    this.canvas = document.getElementById(canvasId);
+    this.gl = this.canvas.getContext('webgl') || this.canvas.getContext('experimental-webgl');
+    var vertex = [
+            -1, -1,
+            -1, 1,
+             1, -1,
+             1, 1
+    ];
+    this.vertexBuffer = createVbo(this.gl, vertex);
 
-window.addEventListener('keydown', function(event){
-   if(event.key == 'ArrowRight'){
-	g_tiltX += 0.05;
-    }else if(event.key == 'ArrowLeft'){
-	g_tiltX -= 0.05;
-    }else if(event.key == 'ArrowUp'){
-	g_tiltY += 0.05;
-    }else if(event.key == 'ArrowDown'){
-	g_tiltY -= 0.05;
-    }else if(event.key == 'n'){
-	g_scale += 0.05;
-    }else if(event.key == 'p'){
-	g_scale -= 0.05;
-    }else if(event.key == 'w'){
-	g_translate[1] -= 0.1;
-    }else if(event.key == 's'){
-	g_translate[1] += 0.1;
-    }else if(event.key == 'a'){
-	g_translate[0] -= 0.1;
-    }else if(event.key == 'd'){
-	g_translate[0] += 0.1;
-    }
-}, false);
+    
+    this.scale = 2.;
+    this.translate = [0, 0];
 
+    this.pixelDensity = window.devicePixelRatio;
+    this.canPlayVideo = false;
+    this.video;
+    this.videoTexture;
+    this.videoResolution = [0, 0];
+    // Use this texture while loading video.
+    this.dummyTexture = this.createTexture(this.gl, 128, 128);
 
-function resizeCanvasFullscreen(){
-    g_canvas.style.width = window.innerWidth + 'px';
-    g_canvas.style.height = window.innerHeight + 'px';
-    g_canvas.width = window.innerWidth * window.devicePixelRatio;
-    g_canvas.height = window.innerHeight * window.devicePixelRatio;
+    this.render = function(){};
+
+    this.resizeCanvasFullscreen();
 }
 
+RenderCanvas.prototype = {
+    resizeCanvasFullscreen: function(){
+        this.canvas.style.width = window.innerWidth + 'px';
+        this.canvas.style.height = window.innerHeight + 'px';
+	this.canvas.width = window.innerWidth * this.pixelDensity;
+	this.canvas.height = window.innerHeight * this.pixelDensity;
+	this.center = [this.canvas.width / 2, this.canvas.height / 2];
+	this.canvasRatio = this.canvas.width / this.canvas.height / 2.;
+    },
+    calcPixel: function(mx, my){
+	var rect = this.canvas.getBoundingClientRect();
+	return [this.scale * (((mx - rect.left) * this.pixelRatio) / this.canvas.height - this.canvasRatio) +
+		this.translate[0],
+		this.scale * -(((my - rect.top) * this.pixelRatio) / this.canvas.height - 0.5) +
+		this.translate[1]];
+    },
+    setWebcam: function (){
+        var renderCanvas = this;
+        navigator.getUserMedia = (
+	    navigator.getUserMedia ||
+	        navigator.webkitGetUserMedia ||
+	        navigator.mozGetUserMedia
+        );
 
-function setupGL(canvas, fragId){
-    var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if(navigator.getUserMedia){
+	    navigator.getUserMedia(
+	        {video: true,
+	         audio: false},
+	        function(localMediaStream){
+		    var url = (
+		        window.URL ||
+			    window.webkitURL ||
+			    window.mozURL
+		    );
+		    renderCanvas.video = document.createElement('video');
+                    renderCanvas.video.src = url.createObjectURL(localMediaStream);
+                    var canplayListener = function(){
+                        renderCanvas.video.removeEventListener('canplay', arguments.callee, true);
+		        renderCanvas.video.play();
+                        renderCanvas.videoResolution = [renderCanvas.video.videoWidth,
+                                                        renderCanvas.video.videoHeight];
+                        renderCanvas.videoTexture = renderCanvas.createTexture(renderCanvas.gl,
+                                                                               renderCanvas.video.videoWidth,
+                                                                               renderCanvas.video.videoHeight);
+                        renderCanvas.canPlayVideo = true;
+		    }
+		    renderCanvas.video.addEventListener('canplay', canplayListener, true);
+	        },
+	        function(err){
+		    if(err.name === 'PermissionDeniedError'){
+		        alert('denied permission');
+		    }else{
+		        alert('can not be used webcam');
+		    }
+	        }
+	    );
+        }else{
+	    alert('not supported getUserMedia');
+        }
+    },
+    createTexture: function(gl, width, height){
+        var type = gl.getExtension('OES_texture_float') ? gl.FLOAT : gl.UNSIGNED_BYTE;
+        var texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, width, height,
+                      0, gl.RGB, type, null);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        return texture;
+    },
+    setUniformLocation: function(uniLocation, gl, program){
+        uniLocation.push(gl.getUniformLocation(program, 'u_texture'));
+        uniLocation.push(gl.getUniformLocation(program, 'u_iResolution'));
+        uniLocation.push(gl.getUniformLocation(program, 'u_iGlobalTime'));
+        uniLocation.push(gl.getUniformLocation(program, 'u_scale'));
+        uniLocation.push(gl.getUniformLocation(program, 'u_translate'));
+    },
+    setUniformValues: function(uniLocation, gl, uniI, width, height){
+        gl.activeTexture(gl.TEXTURE0);
+        if(this.canPlayVideo){
+            gl.bindTexture(gl.TEXTURE_2D, this.videoTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.video);
+            gl.uniform1i(uniLocation[uniI++], this.videoTexture);
+        }else{
+            gl.bindTexture(gl.TEXTURE_2D, this.dummyTexture);
+            gl.uniform1i(uniLocation[uniI++], this.dummyTexture);
+        }
+        gl.uniform2fv(uniLocation[uniI++], [width, height]);
+        gl.uniform1f(uniLocation[uniI++], 0);
+        gl.uniform1f(uniLocation[uniI++], this.scale);
+        gl.uniform2fv(uniLocation[uniI++], this.translate);
+        return uniI;
+    }
+}
+
+function setupGL(renderCanvas, hyperbolicTessellator){
+    var gl = renderCanvas.gl;
     var program = gl.createProgram();
-    attachShader(gl, fragId, program, gl.FRAGMENT_SHADER);
-    attachShader(gl, 'vs', program, gl.VERTEX_SHADER);
+    attachShader(gl, hyperbolicTessellator.fragId, program, gl.FRAGMENT_SHADER);
+    attachShader(gl, hyperbolicTessellator.vertId, program, gl.VERTEX_SHADER);
     program = linkProgram(gl, program);
-
-    var uniLocation = new Array();
-    uniLocation[0] = gl.getUniformLocation(program, 'u_texture');
-    uniLocation[1] = gl.getUniformLocation(program, 'u_iResolution');
-    uniLocation[2] = gl.getUniformLocation(program, 'u_camResolution');
-    uniLocation[3] = gl.getUniformLocation(program, 'u_iGlobalTime');
-    uniLocation[4] = gl.getUniformLocation(program, 'u_tilt');
-    uniLocation[5] = gl.getUniformLocation(program, 'u_scale');
-    uniLocation[6] = gl.getUniformLocation(program, 'u_translate');
-
-    var position = [-1, -1,
-                    -1, 1,
-                    1, -1,
-                    1, 1
-                   ];
-
-    var vPosition = createVbo(gl, position);
+    gl.useProgram(program);
+    
     var vAttLocation = gl.getAttribLocation(program, 'a_vert');
-    gl.bindBuffer(gl.ARRAY_BUFFER, vPosition);
+    gl.bindBuffer(gl.ARRAY_BUFFER, renderCanvas.vertexBuffer);
     gl.enableVertexAttribArray(vAttLocation);
     gl.vertexAttribPointer(vAttLocation, 2, gl.FLOAT, false, 0, 0);
 
-    var videoTexture = gl.createTexture(gl.TEXTURE_2D);
+    var uniLocation = [];
+    renderCanvas.setUniformLocation(uniLocation, gl, program);
+    hyperbolicTessellator.setUniformLocation(uniLocation, gl, program);
+    
+    renderCanvas.render = function(){
+        gl.viewport(0, 0,
+                    renderCanvas.canvas.width,
+                    renderCanvas.canvas.height);
 
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, videoTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, g_video);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-    return [gl, uniLocation];
-}
-
-function render(){
-    var [gl, uniLocation] = setupGL(g_canvas, 'hyperbolic-tessellator');
-
-    var startTime = new Date().getTime();
-    (function(){
-        var elapsedTime = new Date().getTime() - startTime;
-
-        function renderGL(gl, uniLocation, canvas){
-            gl.viewport(0, 0, g_canvas.width, g_canvas.height);
-
-            gl.uniform2fv(uniLocation[1], [canvas.width, canvas.height]);
-            gl.uniform2fv(uniLocation[2], [g_video.videoWidth, g_video.videoHeight]);
-            gl.uniform1f(uniLocation[3], elapsedTime * 0.001);
-            gl.uniform2fv(uniLocation[4], [g_tiltX, g_tiltY]);
-            gl.uniform1f(uniLocation[5], g_scale);
-            gl.uniform2fv(uniLocation[6], g_translate);
-
-	    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, g_video);
-            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-	    gl.flush();
-        }
-        renderGL(gl, uniLocation, g_canvas);
-
-	requestAnimationFrame(arguments.callee);
-    })();
+        var uniI = 0;
+        uniI = renderCanvas.setUniformValues(uniLocation, gl, uniI,
+                                             renderCanvas.canvas.width,
+                                             renderCanvas.canvas.height);
+        uniI = hyperbolicTessellator.setUniformValues(uniLocation, gl, uniI);
+        
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        gl.flush();
+    }
 }
 
 window.addEventListener('load', function(event){
-    g_canvas = document.getElementById('canvas');
-    resizeCanvasFullscreen();
-    setWebcam();
-}, false);
+    var hyperbolicTessellator = new HyperbolicTessellator();
+    var renderCanvas = new RenderCanvas('canvas');
+    renderCanvas.setWebcam();
+
+    setupGL(renderCanvas, hyperbolicTessellator);
+
+    window.addEventListener('resize', function(event){
+        renderCanvas.resizeCanvasFullscreen();
+    });
+    
+    (function(){
+	renderCanvas.render();
+	requestAnimationFrame(arguments.callee);
+    })();
+});
