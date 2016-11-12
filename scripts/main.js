@@ -1,63 +1,10 @@
 var g_canvas;
 var g_video;
 
-var g_midi;
 var g_tiltX = 0;
 var g_tiltY = 0;
 var g_scale = 2.;
 var g_translate = [0, 0];
-
-var KorgNanoKontrol = new Object();
-KorgNanoKontrol.knob = new Object();
-KorgNanoKontrol.slider = new Object();
-KorgNanoKontrol.buttonS = new Object();
-KorgNanoKontrol.buttonM = new Object();
-KorgNanoKontrol.buttonR = new Object();
-KorgNanoKontrol.buttonCycle = 46;
-KorgNanoKontrol.controlListeners = new Object();
-for(var i = 0 ; i < 8 ; i++){
-    KorgNanoKontrol.slider[i] = i;
-    KorgNanoKontrol.knob[i] = 16 + i;
-    KorgNanoKontrol.buttonS[i] = 33 + i;
-    KorgNanoKontrol.buttonM[i] = 48 + i;
-    KorgNanoKontrol.buttonR[i] = 64 + i;
-}
-
-KorgNanoKontrol.addControlListaner = function(inputId, listener){
-    KorgNanoKontrol.controlListeners[inputId] = listener;
-}
-KorgNanoKontrol.onMidiMessage = function(inputId, value){
-    if(KorgNanoKontrol.controlListeners[inputId] != undefined)
-        KorgNanoKontrol.controlListeners[inputId](value);
-}
-
-function success(midiAccess){
-    g_midi = midiAccess;
-    console.log("MIDI SUCCESS");
-    setInputs(midiAccess);
-}
-
-function failure(msg){
-    console.log("MIDI FAILED - " + msg);
-}
-
-function setInputs(midiAccess){
-    var inputs = midiAccess.inputs;
-    inputs.forEach(function(key, port){
-        console.log("[" + key.state + "] manufacturer:" + key.manufacturer + " / name:" + key.name + " / port:" + port);
-        key.onmidimessage = onMidiMessage;
-    });
-}
-
-function onMidiMessage(event){
-    console.log(event);
-    var str = '';
-    for (var i = 0; i < event.data.length; i++) {
-        str += event.data[i] + ':';
-    }
-    console.log(str);
-    KorgNanoKontrol.onMidiMessage(event.data[1], event.data[2]);
-}
 
 function setWebcam(){
     navigator.getUserMedia = (
@@ -98,38 +45,6 @@ function setWebcam(){
     }
 }
 
-window.addEventListener('load', function(event){
-    var i = 0;
-    KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
-                                       function(value){
-                                           g_tiltX = (value) / 127 * Math.PI / 2.;
-                                       });
-     KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
-                                        function(value){
-                                            g_tiltY = (value - 64) / 64 * Math.PI / 5.5;
-                                        });
-    KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
-                                       function(value){
-                                           g_scale = .1 + value / 10;
-                                       });
-    KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
-                                       function(value){
-                                           g_translate[0] = (value - 64) / 16;
-                                       });
-    KorgNanoKontrol.addControlListaner(KorgNanoKontrol.knob[i++],
-                                       function(value){
-                                           g_translate[1] = (value - 64) / 16;
-                                       });
-    KorgNanoKontrol.addControlListaner(KorgNanoKontrol.buttonCycle,
-                                       function(value){
-                                           location.reload();
-                                       });
-    navigator.requestMIDIAccess().then(success, failure)
-    g_canvas = document.getElementById('canvas');
-    resizeCanvasFullscreen();
-    setWebcam();
-}, false);
-
 window.addEventListener('resize', function(event){
     resizeCanvasFullscreen();
 }, false);
@@ -158,22 +73,6 @@ window.addEventListener('keydown', function(event){
     }
 }, false);
 
-/*
-var g_scaleFactor = 0.1;
-window.onmousewheel = function(event){
-    if(event.wheelDelta < 0.){
-        if((g_scale + g_scaleFactor) / 10 > g_scale / 10){
-            g_scaleFactor *= 10;
-        }
-        g_scale += g_scaleFactor;
-    }else{
-        if(g_scale - g_scaleFactor <= 0.){
-            g_scaleFactor /= 10;
-        }
-        g_scale -= g_scaleFactor;
-    }
-}
-*/
 
 function resizeCanvasFullscreen(){
     g_canvas.style.width = window.innerWidth + 'px';
@@ -191,30 +90,25 @@ function setupGL(canvas, fragId){
     program = linkProgram(gl, program);
 
     var uniLocation = new Array();
-    uniLocation[0] = gl.getUniformLocation(program, 'texture');
-    uniLocation[1] = gl.getUniformLocation(program, 'iResolution');
-    uniLocation[2] = gl.getUniformLocation(program, 'camResolution');
-    uniLocation[3] = gl.getUniformLocation(program, 'iGlobalTime');
-    uniLocation[4] = gl.getUniformLocation(program, 'tilt');
-    uniLocation[5] = gl.getUniformLocation(program, 'scale');
-    uniLocation[6] = gl.getUniformLocation(program, 'translate');
+    uniLocation[0] = gl.getUniformLocation(program, 'u_texture');
+    uniLocation[1] = gl.getUniformLocation(program, 'u_iResolution');
+    uniLocation[2] = gl.getUniformLocation(program, 'u_camResolution');
+    uniLocation[3] = gl.getUniformLocation(program, 'u_iGlobalTime');
+    uniLocation[4] = gl.getUniformLocation(program, 'u_tilt');
+    uniLocation[5] = gl.getUniformLocation(program, 'u_scale');
+    uniLocation[6] = gl.getUniformLocation(program, 'u_translate');
 
-    var position = [-1.0, 1.0, 0.0,
-                    1.0, 1.0, 0.0,
-	            -1.0, -1.0,  0.0,
-	            1.0, -1.0, 0.0
+    var position = [-1, -1,
+                    -1, 1,
+                    1, -1,
+                    1, 1
                    ];
-    var index = [
-	0, 2, 1,
-	1, 2, 3
-    ];
+
     var vPosition = createVbo(gl, position);
-    var vIndex = createIbo(gl, index);
-    var vAttLocation = gl.getAttribLocation(program, 'position');
+    var vAttLocation = gl.getAttribLocation(program, 'a_vert');
     gl.bindBuffer(gl.ARRAY_BUFFER, vPosition);
     gl.enableVertexAttribArray(vAttLocation);
-    gl.vertexAttribPointer(vAttLocation, 3, gl.FLOAT, false, 0, 0);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, vIndex);
+    gl.vertexAttribPointer(vAttLocation, 2, gl.FLOAT, false, 0, 0);
 
     var videoTexture = gl.createTexture(gl.TEXTURE_2D);
 
@@ -238,8 +132,6 @@ function render(){
 
         function renderGL(gl, uniLocation, canvas){
             gl.viewport(0, 0, g_canvas.width, g_canvas.height);
-            gl.clearColor(0.0, 0.0, 0.0, 1.0);
-	    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
             gl.uniform2fv(uniLocation[1], [canvas.width, canvas.height]);
             gl.uniform2fv(uniLocation[2], [g_video.videoWidth, g_video.videoHeight]);
@@ -249,7 +141,7 @@ function render(){
             gl.uniform2fv(uniLocation[6], g_translate);
 
 	    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, g_video);
-            gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
 	    gl.flush();
         }
@@ -259,41 +151,8 @@ function render(){
     })();
 }
 
-function attachShader(gl, shaderId, program, shaderType){
-    var shader = gl.createShader(shaderType);
-    elem = document.getElementById(shaderId).text;
-    gl.shaderSource(shader, elem);
-    gl.compileShader(shader);
-    if(gl.getShaderParameter(shader, gl.COMPILE_STATUS)){
-        gl.attachShader(program, shader);
-    }else{
-	alert(gl.getShaderInfoLog(shader));
-	console.log(gl.getShaderInfoLog(shader));
-    }
-}
-
-function linkProgram(gl, program){
-    gl.linkProgram(program);
-    if(gl.getProgramParameter(program, gl.LINK_STATUS)){
-	gl.useProgram(program);
-	return program;
-    }else{
-	return null;
-    }
-}
-
-function createVbo(gl, data){
-    var vbo = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
-    gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    return vbo;
-}
-
-function createIbo(gl, data){
-    var ibo = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Int16Array(data), gl.STATIC_DRAW);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
-    return ibo;
-}
+window.addEventListener('load', function(event){
+    g_canvas = document.getElementById('canvas');
+    resizeCanvasFullscreen();
+    setWebcam();
+}, false);
