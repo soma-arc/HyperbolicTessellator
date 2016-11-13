@@ -17,6 +17,7 @@ HyperbolicTessellator.prototype = {
 var RenderCanvas = function(canvasId){
     this.canvasId = canvasId;
     this.canvas = document.getElementById(canvasId);
+    this.canvasRatio =  this.canvas.width / this.canvas.height / 2.;
     this.gl = this.canvas.getContext('webgl') || this.canvas.getContext('experimental-webgl');
     var vertex = [
             -1, -1,
@@ -41,6 +42,9 @@ var RenderCanvas = function(canvasId){
     this.render = function(){};
 
     this.resizeCanvasFullscreen();
+
+    this.isMousePressing = false;
+    this.prevMousePos = [0, 0];
 }
 
 RenderCanvas.prototype = {
@@ -54,9 +58,9 @@ RenderCanvas.prototype = {
     },
     calcPixel: function(mx, my){
 	var rect = this.canvas.getBoundingClientRect();
-	return [this.scale * (((mx - rect.left) * this.pixelRatio) / this.canvas.height - this.canvasRatio) +
+	return [this.scale * (((mx - rect.left) * this.pixelDensity) / this.canvas.height - this.canvasRatio) +
 		this.translate[0],
-		this.scale * -(((my - rect.top) * this.pixelRatio) / this.canvas.height - 0.5) +
+		this.scale * -(((my - rect.top) * this.pixelDensity) / this.canvas.height - 0.5) +
 		this.translate[1]];
     },
     setWebcam: function (){
@@ -183,6 +187,40 @@ window.addEventListener('load', function(event){
 
     window.addEventListener('resize', function(event){
         renderCanvas.resizeCanvasFullscreen();
+    });
+
+    renderCanvas.canvas.addEventListener("contextmenu", function(event){
+	// disable right-click context-menu
+        event.preventDefault();
+    });
+    
+    renderCanvas.canvas.addEventListener('mousewheel', function(event){
+	event.preventDefault();
+	if(event.wheelDelta > 0){
+            renderCanvas.scale *= 0.75;
+	}else{
+            renderCanvas.scale *= 1.5;
+	}
+    });
+
+    renderCanvas.canvas.addEventListener('mouseup', function(event){
+	renderCanvas.isMousePressing = false;
+    });
+
+    renderCanvas.canvas.addEventListener('mousedown', function(event){
+	event.preventDefault();
+	var mouse = renderCanvas.calcPixel(event.clientX, event.clientY);
+        renderCanvas.prevMousePos = mouse;
+	renderCanvas.isMousePressing = true;
+    });
+
+    renderCanvas.canvas.addEventListener('mousemove', function(event){
+	if(!renderCanvas.isMousePressing) return;
+	var mouse = renderCanvas.calcPixel(event.clientX, event.clientY);
+	if(event.button == 2){
+            renderCanvas.translate[0] -= mouse[0] - renderCanvas.prevMousePos[0];
+            renderCanvas.translate[1] -= mouse[1] - renderCanvas.prevMousePos[1];
+        }
     });
     
     (function(){
