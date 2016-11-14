@@ -222,6 +222,8 @@ window.addEventListener('load', function(event){
             renderCanvas.translate[1] -= mouse[1] - renderCanvas.prevMousePos[1];
         }
     });
+
+    var gui = new dat.GUI();
     
     (function(){
 	renderCanvas.render();
