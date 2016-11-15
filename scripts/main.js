@@ -1,15 +1,52 @@
 var HyperbolicTessellator = function(){
     this.fragId = 'hyperbolic-tessellator';
     this.vertId = 'vs';
-    this.tilt = [0, 0];
+
+    this.tiltX = 0;
+    this.tiltY = 0;
+    this.mixFactor = 0;
+    this.xyReverse = false;
+    this.displayLine = false;
+    this.displayOuter = false;
+    this.hueStep = 0;
+    this.hsvColor1 = { h: 0, s: 1, v: 1 };
+    this.hsvColor2 = { h: 250, s: 1, v: 1 };
+    this.outerHsvColor1 = { h: 180, s: 1, v: 1 };
+    this.outerHsvColor2 = { h: 324, s: 1, v: 1 };
 }
 
 HyperbolicTessellator.prototype = {
     setUniformLocation: function(uniLocation, gl, program){
         uniLocation.push(gl.getUniformLocation(program, 'u_tilt'));
+        uniLocation.push(gl.getUniformLocation(program, 'u_mixFactor'));
+        uniLocation.push(gl.getUniformLocation(program, 'u_xyReverse'));
+        uniLocation.push(gl.getUniformLocation(program, 'u_displayLine'));
+        uniLocation.push(gl.getUniformLocation(program, 'u_displayOuter'));
+        uniLocation.push(gl.getUniformLocation(program, 'u_hueStep'));
+        uniLocation.push(gl.getUniformLocation(program, 'u_hsvColor1'));
+        uniLocation.push(gl.getUniformLocation(program, 'u_hsvColor2'));
+        uniLocation.push(gl.getUniformLocation(program, 'u_outerHsvColor1'));
+        uniLocation.push(gl.getUniformLocation(program, 'u_outerHsvColor2'));
     },
     setUniformValues: function(uniLocation, gl, uniI){
-        gl.uniform2fv(uniLocation[uniI++], this.tilt);
+        gl.uniform2fv(uniLocation[uniI++], [this.tiltX, this.tiltY]);
+        gl.uniform1f(uniLocation[uniI++], this.mixFactor);
+        gl.uniform1i(uniLocation[uniI++], this.xyReverse);
+        gl.uniform1i(uniLocation[uniI++], this.displayLine);
+        gl.uniform1i(uniLocation[uniI++], this.displayOuter);
+        gl.uniform1f(uniLocation[uniI++], this.hueStep);
+        gl.uniform3fv(uniLocation[uniI++], [this.hsvColor1.h / 360,
+                                            this.hsvColor1.s,
+                                            this.hsvColor1.v]);
+        gl.uniform3fv(uniLocation[uniI++], [this.hsvColor2.h / 360,
+                                            this.hsvColor2.s,
+                                            this.hsvColor2.v]);
+        gl.uniform3fv(uniLocation[uniI++], [this.outerHsvColor1.h / 360,
+                                            this.outerHsvColor1.s,
+                                            this.outerHsvColor1.v]);
+        gl.uniform3fv(uniLocation[uniI++], [this.outerHsvColor2.h / 360,
+                                            this.outerHsvColor2.s,
+                                            this.outerHsvColor2.v]);
         return uniI;
     }
 }
@@ -224,7 +261,20 @@ window.addEventListener('load', function(event){
     });
 
     var gui = new dat.GUI();
-    
+    var f1 = gui.addFolder('Parameter');
+    f1.add(hyperbolicTessellator, 'tiltX', -1.5, 1.5).step(0.01);
+    f1.add(hyperbolicTessellator, 'tiltY', -1.5, 1.5).step(0.01);
+    f1.add(hyperbolicTessellator, 'xyReverse');
+    f1.add(hyperbolicTessellator, 'displayLine');
+    f1.add(hyperbolicTessellator, 'displayOuter');
+    var f2 = gui.addFolder('Color');
+    f2.add(hyperbolicTessellator, 'mixFactor', 0, 1).step(0.01);
+    f2.add(hyperbolicTessellator, 'hueStep', 0, 1).step(0.01);
+    f2.addColor(hyperbolicTessellator, 'hsvColor1');
+    f2.addColor(hyperbolicTessellator, 'hsvColor2');
+    f2.addColor(hyperbolicTessellator, 'outerHsvColor1');
+    f2.addColor(hyperbolicTessellator, 'outerHsvColor2');
+    console.log('hoge');
     (function(){
 	renderCanvas.render();
 	requestAnimationFrame(arguments.callee);

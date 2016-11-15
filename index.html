@@ -23,7 +23,7 @@
   </script>
 
   <script id="hyperbolic-tessellator" type="x-shader/x-fragment">
-   precision mediump float;
+   precision highp float;
 
    uniform float u_iGlobalTime;
    uniform vec2 u_iResolution;
@@ -34,10 +34,14 @@
    uniform vec2 u_translate;
    uniform int u_xyReverse;
    uniform float u_mixFactor;
-   uniform int u_drawLine;
+   uniform int u_displayLine;
    uniform float u_rotation;
-   uniform int u_drawOuter;
+   uniform int u_displayOuter;
    uniform float u_hueStep;
+   uniform vec3 u_hsvColor1;
+   uniform vec3 u_hsvColor2;
+   uniform vec3 u_outerHsvColor1;
+   uniform vec3 u_outerHsvColor2;
 
    vec2 rand2n(vec2 co, float sampleIndex) {
        vec2 seed = co * (sampleIndex + 1.0);
@@ -178,7 +182,7 @@
                if(length(pos) > 1.5){
 		   g_pos = pos;
 		   outer = true;
-		   if(u_drawOuter == 1){
+		   if(u_displayOuter == 1){
 		       return invCount;
 		   }else{
 		       return 0;
@@ -217,7 +221,7 @@
        return vec3(pos, distance(pos, line.xy));
    }
 
-   const float sampleNum = 5.;
+   const float sampleNum = 10.;
    void main( ){
 
        float t = mod(u_iGlobalTime, 10.);
@@ -290,7 +294,7 @@
                sum += vec3(0.,0.,0.);
 	   }else{
                vec3 ss;
-               if(u_drawLine == 1){
+               if(u_displayLine == 1){
 		   if(abs(distance(g_pos, cPos1) - cr1) < 0.01 ||
 		      abs(distance(g_pos, cPos2) - cr2) < 0.01 ||
 		      abs(distance(g_pos, -cPos1) - cr1) < 0.01 ||
@@ -306,15 +310,23 @@
                vec3 ss2;
                if(mod(float(d), 2.) == 0.){
 		   if(outer){
-		       ss2 = hsv2rgb(vec3(0.5 + u_hueStep * colCount, 1., 1.));
+		       ss2 = hsv2rgb(vec3(u_outerHsvColor1.x + u_hueStep * colCount,
+                                          u_outerHsvColor1.y,
+                                          u_outerHsvColor1.z));
 		   }else{
-		       ss2 = hsv2rgb(vec3(u_hueStep * colCount, 1., 1.));
+		       ss2 = hsv2rgb(vec3(u_hsvColor1.x + u_hueStep * colCount,
+                                          u_hsvColor1.y,
+                                          u_hsvColor1.z));
 		   }
                }else{
 		   if(outer){
-		       ss2 = hsv2rgb(vec3(0.9 + u_hueStep * colCount, 1., 1.));
+		       ss2 = hsv2rgb(vec3(u_outerHsvColor2.x + u_hueStep * colCount,
+                                          u_outerHsvColor2.y,
+                                          u_outerHsvColor2.z));
 		   }else{
-		       ss2 = hsv2rgb(vec3(0.7 + u_hueStep * colCount, 1., 1.));
+		       ss2 = hsv2rgb(vec3(u_hsvColor2.x + u_hueStep * colCount,
+                                          u_hsvColor2.y,
+                                          u_hsvColor2.z));
 		   }
                }
                sum += mix(ss, ss2, u_mixFactor);
