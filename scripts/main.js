@@ -4,7 +4,7 @@ var HyperbolicTessellator = function(){
 
     this.tiltX = 0;
     this.tiltY = 0;
-    this.mixFactor = 0;
+    this.mixFactor = 0.5;
     this.xyReverse = false;
     this.displayLine = false;
     this.displayOuter = false;
@@ -179,6 +179,13 @@ RenderCanvas.prototype = {
         gl.uniform1f(uniLocation[uniI++], this.scale);
         gl.uniform2fv(uniLocation[uniI++], this.translate);
         return uniI;
+    },
+    saveImage: function(){
+        this.render();
+        var a = document.createElement('a');
+        a.href = this.canvas.toDataURL();
+        a.download = "tessellation.png"
+        a.click();
     }
 }
 
@@ -274,7 +281,8 @@ window.addEventListener('load', function(event){
     f2.addColor(hyperbolicTessellator, 'hsvColor2');
     f2.addColor(hyperbolicTessellator, 'outerHsvColor1');
     f2.addColor(hyperbolicTessellator, 'outerHsvColor2');
-    console.log('hoge');
+    gui.add(renderCanvas, 'saveImage');
+
     (function(){
 	renderCanvas.render();
 	requestAnimationFrame(arguments.callee);
