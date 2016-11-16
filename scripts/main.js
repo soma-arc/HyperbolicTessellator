@@ -186,6 +186,9 @@ RenderCanvas.prototype = {
         a.href = this.canvas.toDataURL();
         a.download = "tessellation.png"
         a.click();
+    },
+    viewSource: function(){
+        window.open('https://github.com/soma-arc/HyperbolicTessellator');
     }
 }
 
@@ -281,7 +284,9 @@ window.addEventListener('load', function(event){
     f2.addColor(hyperbolicTessellator, 'hsvColor2');
     f2.addColor(hyperbolicTessellator, 'outerHsvColor1');
     f2.addColor(hyperbolicTessellator, 'outerHsvColor2');
-    gui.add(renderCanvas, 'saveImage');
+    var f3 = gui.addFolder('Others');
+    f3.add(renderCanvas, 'saveImage');
+    f3.add(renderCanvas, 'viewSource');
 
     (function(){
 	renderCanvas.render();
