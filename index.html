@@ -1,6 +1,7 @@
 
-<html><head>
-  <title>Hyperbolic Tessellator</title>
+<html id="htmlElem"><head>
+    <title>Hyperbolic Tessellator</title>
+    <link rel="stylesheet" href="./lib/keen-ui.min.css">
   <style>
    body {
        margin: 0;
@@ -9,7 +10,19 @@
        cursor: crosshair;
        background-color: black;
    }
+
+   .ui-modal-header-text {
+       font-family: "Times New Roman";
+       font-size: 3rem;
+   }
+
+   .ui-modal-body {
+       font-family: "Times New Roman";
+       font-size: 1.2rem;
+   }
   </style>
+  <script type="text/javascript" src="./lib/vue.min.js"></script>
+  <script type="text/javascript" src="./lib/keen-ui.min.js"></script>
   <script src="./lib/dat.gui.min.js" type="text/javascript"></script>
   <script src="./scripts/util.js" type="text/javascript"></script>
   <script src="./scripts/main.js" type="text/javascript"></script>
@@ -338,4 +351,15 @@
 </head>
 <body>
     <canvas id="canvas" width="512" height="512"></canvas>
-</body></html>
+</body>
+        </header>
+        <ui-modal :show.sync="renderCanvas.isDisplayingInstruction">
+            <div slot="header" class="ui-modal-header-text">
+                Usage
+            </div>
+            <ul>
+	        <li>Right Drag: Move</li>
+	        <li>Wheel: Zoom</li>
+            </ul>
+        </ui-modal>
+</html>

@@ -82,6 +82,8 @@ var RenderCanvas = function(canvasId){
 
     this.isMousePressing = false;
     this.prevMousePos = [0, 0];
+
+    this.isDisplayingInstruction = false;
 }
 
 RenderCanvas.prototype = {
@@ -189,6 +191,9 @@ RenderCanvas.prototype = {
     },
     viewSource: function(){
         window.open('https://github.com/soma-arc/HyperbolicTessellator');
+    },
+    viewInstruction: function(){
+	this.isDisplayingInstruction = true;
     }
 }
 
@@ -287,6 +292,14 @@ window.addEventListener('load', function(event){
     var f3 = gui.addFolder('Others');
     f3.add(renderCanvas, 'saveImage');
     f3.add(renderCanvas, 'viewSource');
+
+    Vue.use(Keen);
+    var app = new Vue({
+	el: '#htmlElem',
+	data: {renderCanvas: renderCanvas},
+    });
+
+    f3.add(renderCanvas, 'viewInstruction');
 
     (function(){
 	renderCanvas.render();
