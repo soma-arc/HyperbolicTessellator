@@ -277,8 +277,8 @@ window.addEventListener('load', function(event){
 
     var gui = new dat.GUI();
     var f1 = gui.addFolder('Parameter');
-    f1.add(hyperbolicTessellator, 'tiltX', -1.5, 1.5).step(0.01);
-    f1.add(hyperbolicTessellator, 'tiltY', -1.5, 1.5).step(0.01);
+    f1.add(hyperbolicTessellator, 'tiltX', -1.5, 1.5).step(0.001);
+    f1.add(hyperbolicTessellator, 'tiltY', -1.5, 1.5).step(0.001);
     f1.add(hyperbolicTessellator, 'xyReverse');
     f1.add(hyperbolicTessellator, 'displayLine');
     f1.add(hyperbolicTessellator, 'displayOuter');

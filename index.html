@@ -211,12 +211,12 @@
        return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
    }
 
-   vec3 calcTilingColor(vec2 position, vec2 texTranslate, vec2 texSize){
+   vec3 calcTilingColor(vec3 baseColor, vec2 position, vec2 texTranslate, vec2 texSize){
        vec4 result = IIS(position);
        float colCount = result.y;
        vec2 endPos = result.zw;
        if(result.x == 0.){
-           return vec3(0.,0.,0.);
+           return baseColor;
        }else{
            vec3 texColor;
            if(u_displayLine == 1){
@@ -311,7 +311,426 @@
 	   position += u_translate;
 	   position = m * position;
 
-           sum += calcTilingColor(position, texTranslate, texSize);
+           sum += calcTilingColor(vec3(0), position, texTranslate, texSize);
+       }
+       gl_FragColor = vec4(sum/SAMPLE_NUM, 1.);
+   }
+  </script>
+  <script id="hyperbolic-tessellator-spherical" type="x-shader/x-fragment">
+   precision highp float;
+
+   uniform float u_iGlobalTime;
+   uniform vec2 u_iResolution;
+   uniform vec2 u_camResolution;
+   uniform sampler2D u_texture;
+   uniform vec2 u_tilt;
+   uniform float u_scale;
+   uniform vec2 u_translate;
+   uniform int u_xyReverse;
+   uniform float u_mixFactor;
+   uniform int u_displayLine;
+   uniform float u_rotation;
+   uniform int u_displayOuter;
+   uniform float u_hueStep;
+   uniform vec3 u_hsvColor1;
+   uniform vec3 u_hsvColor2;
+   uniform vec3 u_outerHsvColor1;
+   uniform vec3 u_outerHsvColor2;
+
+   vec2 rand2n(vec2 co, float sampleIndex) {
+       vec2 seed = co * (sampleIndex + 1.0);
+       seed+=vec2(-1,1);
+       // implementation based on: lumina.sourceforge.net/Tutorials/Noise.html
+       return vec2(fract(sin(dot(seed.xy ,vec2(12.9898,78.233))) * 43758.5453),
+                   fract(cos(dot(seed.xy ,vec2(4.898,7.23))) * 23421.631));
+   }
+
+   const float NO_ANSWER = -999999.;
+
+   const float PI = 3.14159265359;
+   const float fourPI = 12.566368;
+   const float EPSILON = 0.01;
+
+   const vec3 BLACK = vec3(0);
+   const vec3 WHITE = vec3(1);
+   const vec3 LIGHT_GRAY = vec3(0.78);
+   const vec3 RED = vec3(1, 0, 0);
+   const vec3 GREEN = vec3(0, .78, 0);
+   const vec3 BLUE = vec3(0, 0, 1);
+   const vec3 YELLOW = vec3(1, 1, 0);
+   const vec3 PINK = vec3(.78, 0, .78);
+   const vec3 LIGHT_BLUE = vec3(0, 1, 1);
+
+   const vec3 AMBIENT_FACTOR = vec3(0.1);
+
+   const float NO_HIT = 99999999.;
+
+   const int MTL_DIFFUSE = 0;
+   const int MTL_TRANSPARENT = 1;
+
+   vec3 g_circle1;
+   vec3 g_circle2;
+
+   vec2 circleInverse(vec2 pos, vec2 circlePos, float circleR){
+       return ((pos - circlePos) * circleR * circleR)/(length(pos - circlePos) * length(pos - circlePos) ) + circlePos;
+   }
+
+   vec2 reverseStereoProject(vec3 pos){
+       return vec2(pos.x / (1. - pos.z), pos.y / (1. - pos.z));
+   }
+
+   vec4 circleIntersection(vec3 circle1, vec3 circle2){
+       float x = circle1.x - circle2.x;
+       float y = circle1.y - circle2.y;
+       float x2 = x * x;
+       float y2 = y * y;
+       float x2y2 = x2 + y2;
+       float a = (x2y2 + circle2.z * circle2.z - circle1.z * circle1.z) / 2.;
+       float a2 = a * a;
+       if(x2y2 * circle2.z * circle2.z - a2 < 0.) return vec4(NO_ANSWER);
+       float numR = sqrt(x2y2 * circle2.z * circle2.z - a2);
+       return vec4((a * x + y * numR) / x2y2 + circle2.x, (a * y - x * numR) / x2y2 + circle2.y,
+                   (a * x - y * numR) / x2y2 + circle2.x, (a * y + x * numR) / x2y2 + circle2.y);
+   }
+
+   vec3 stereoProject(vec2 pos){
+       float x = pos.x;
+       float y = pos.y;
+       float x2y2 = x * x + y * y;
+       return vec3((2. * x) / (1. + x2y2),
+                   (2. * y) / (1. + x2y2),
+                   (-1. + x2y2) / (1. + x2y2));
+   }
+
+   vec3 getCircleFromSphere(vec3 upper, vec3 lower){
+       vec2 p1 = reverseStereoProject(upper);
+       vec2 p2 = reverseStereoProject(lower);
+       return vec3((p1 + p2) / 2., distance(p1, p2)/ 2.);
+   }
+
+   int g_objId = -1;
+   int g_mtl = -1;
+   vec4 intersectSphere(int objId, int mtl,
+			vec3 sphereCenter, float radius,
+			vec3 rayOrigin, vec3 rayDir,
+                        vec4 isect){
+       vec3 v = rayOrigin - sphereCenter;
+       float b = dot(rayDir, v);
+       float c = dot(v, v) - radius * radius;
+       float d = b * b - c;
+       if(d >= 0.){
+           float s = sqrt(d);
+           float t = -b - s;
+           if(t <= EPSILON) t = -b + s;
+           if(EPSILON < t && t < isect.x){
+	       vec3 intersection = (rayOrigin + t * rayDir);
+	       g_objId = objId;
+	       g_mtl = mtl;
+               return vec4(t, normalize(intersection - sphereCenter));
+           }
+       }
+       return isect;
+   }
+
+   vec4 intersectPlane(int objId, int mtl,
+                   vec3 p, vec3 n,
+                   vec3 rayOrigin, vec3 rayDir, vec4 isect){
+       float d = -dot(p, n);
+       float v = dot(n, rayDir);
+       float t = -(dot(n, rayOrigin) + d) / v;
+       if(EPSILON < t && t < isect.x){
+           g_objId = objId;
+	   g_mtl = mtl;
+    	   return vec4(t, n);
+       }
+       return isect;
+   }
+
+   const int ITERATIONS = 50;
+   bool g_revCircle = false;
+   bool g_revCircle2 = false;
+   bool g_isOuter = false;
+   //return (invCount, colCount, posX, posY)
+   vec4 IIS(vec2 pos){
+       int colCount = 0;
+       //if(length(pos) > 1.) return 0;
+
+       bool fund = true;
+       int invCount = 1;
+       for(int i = 0 ; i < ITERATIONS ; i++){
+	   fund = true;
+	   if(u_xyReverse == 1){
+               if (pos.x < 0.){
+		   pos *= vec2(-1, 1);
+		   invCount++;
+		   fund = false;
+               }
+               if(pos.y < 0.){
+		   pos *= vec2(1, -1);
+		   invCount++;
+		   fund = false;
+               }
+	   }
+	   if(g_revCircle){
+               if(distance(pos, g_circle1.xy) > g_circle1.z ){
+		   pos = circleInverse(pos, g_circle1.xy, g_circle1.z);
+		   invCount++;
+		   colCount++;
+		   fund = false;
+               }
+               if(distance(pos, -g_circle1.xy) > g_circle1.z ){
+		   pos = circleInverse(pos, -g_circle1.xy, g_circle1.z);
+		   invCount++;
+		   colCount++;
+		   fund = false;
+               }
+	   }else{
+               if(distance(pos, g_circle1.xy) < g_circle1.z ){
+		   pos = circleInverse(pos, g_circle1.xy, g_circle1.z);
+		   invCount++;
+		   colCount++;
+		   fund = false;
+               }
+               if(distance(pos, -g_circle1.xy) < g_circle1.z ){
+		   pos = circleInverse(pos, -g_circle1.xy, g_circle1.z);
+		   invCount++;
+		   colCount++;
+		   fund = false;
+               }
+	   }
+
+	   if(g_revCircle2){
+               if(distance(pos, g_circle2.xy) > g_circle2.z ){
+		   pos = circleInverse(pos, g_circle2.xy, g_circle2.z);
+		   invCount++;
+		   colCount++;
+		   fund = false;
+               }
+               if(distance(pos, -g_circle2.xy) > g_circle2.z ){
+		   pos = circleInverse(pos, -g_circle2.xy, g_circle2.z);
+		   invCount++;
+		   colCount++;
+		   fund = false;
+               }
+	   }else{
+               if(distance(pos, g_circle2.xy) < g_circle2.z ){
+		   pos = circleInverse(pos, g_circle2.xy, g_circle2.z);
+		   invCount++;
+		   colCount++;
+		   fund = false;
+               }
+               if(distance(pos, -g_circle2.xy) < g_circle2.z ){
+		   pos = circleInverse(pos, -g_circle2.xy, g_circle2.z);
+		   invCount++;
+		   colCount++;
+		   fund = false;
+               }
+	   }
+
+	   if(fund){
+               if(length(pos) > 1.5){
+		   g_isOuter = true;
+		   if(u_displayOuter == 1){
+                       return vec4(invCount, colCount, pos);
+		   }else{
+                       return vec4(0, colCount, pos);
+		   }
+               }
+               return vec4(invCount, colCount, pos);
+	   }
+       }
+
+       return vec4(invCount, colCount, pos);
+   }
+
+   vec3 hsv2rgb(vec3 c)
+   {
+       vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+       vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+       return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+   }
+
+   vec2 g_texTranslate;
+   vec2 g_texSize;
+   vec3 calcTilingColor(vec3 baseColor, vec2 position, vec2 texTranslate, vec2 texSize){
+       vec4 result = IIS(position);
+       float colCount = result.y;
+       vec2 endPos = result.zw;
+       if(result.x == 0.){
+           return baseColor;
+       }else{
+           vec3 texColor;
+           if(u_displayLine == 1){
+	       if(abs(distance(endPos, g_circle1.xy) - g_circle1.z) < 0.01 ||
+		  abs(distance(endPos, g_circle2.xy) - g_circle2.z) < 0.01 ||
+		  abs(distance(endPos, -g_circle1.xy) - g_circle1.z) < 0.01 ||
+		  abs(distance(endPos, -g_circle2.xy) - g_circle2.z) < 0.01){
+                   texColor = vec3(0, 0, 0);
+	       }else{
+                   texColor = texture2D(u_texture, abs( vec2( 1.) - (endPos + texTranslate) / texSize)).rgb;
+	       }
+           }else{
+	       texColor = texture2D(u_texture, abs( vec2( 1.) - (endPos + texTranslate) / texSize)).rgb;
+           }
+           vec3 tileColor;
+           if(mod(float(result.x), 2.) == 0.){
+	       if(g_isOuter){
+		   tileColor = hsv2rgb(vec3(u_outerHsvColor1.x + u_hueStep * colCount,
+                                            u_outerHsvColor1.y,
+                                            u_outerHsvColor1.z));
+	       }else{
+		   tileColor = hsv2rgb(vec3(u_hsvColor1.x + u_hueStep * colCount,
+                                            u_hsvColor1.y,
+                                            u_hsvColor1.z));
+	       }
+           }else{
+	       if(g_isOuter){
+		   tileColor = hsv2rgb(vec3(u_outerHsvColor2.x + u_hueStep * colCount,
+                                            u_outerHsvColor2.y,
+                                            u_outerHsvColor2.z));
+	       }else{
+		   tileColor = hsv2rgb(vec3(u_hsvColor2.x + u_hueStep * colCount,
+                                            u_hsvColor2.y,
+                                            u_hsvColor2.z));
+	       }
+           }
+           return mix(texColor, tileColor, u_mixFactor);
+       }
+   }
+
+   vec4 getIntersection(vec3 eye, vec3 ray){
+       vec4 isect = vec4(NO_HIT);
+       isect = intersectPlane(0, MTL_DIFFUSE,
+                              vec3(0), vec3(0, 1, 0),
+                              eye, ray, isect);
+       isect = intersectSphere(1, MTL_DIFFUSE,
+                               vec3(0, .5, 0), .5,
+                               eye, ray, isect);
+       return isect;
+   }
+
+   bool visible(vec3 eye, vec3 target){
+       vec3 v = normalize(target - eye);
+       return getIntersection(eye, v).x == NO_HIT;
+   }
+
+   vec3 diffuseLighting(const vec3 p, const vec3 n, const vec3 diffuseColor,
+                                                          const vec3 lightPos, const vec3 lightPower){
+       vec3 v = lightPos - p;
+       float d = dot(n, normalize(v));
+       float r = length(v);
+       return (d > 0. && visible(p + EPSILON * n, lightPos)) ?
+    	      (lightPower * (d / (fourPI * r * r))) * diffuseColor
+    	    : BLACK;
+   }
+
+   const vec3 LIGHT_DIR = normalize(vec3(0.0, 1., 0.5));
+   const int MAX_TRACE_DEPTH = 7;
+   const float TRANSPARENCY = .8;
+   const vec3 LIGHT_POS = vec3(0, 5, 3);
+   const vec3 LIGHT_POWER = vec3(300.);
+
+   vec3 calcColor(vec3 eye, vec3 ray){
+       vec3 l = BLACK;
+       float coeff = 1.0;
+       for (int depth = 0 ; depth < MAX_TRACE_DEPTH ; depth++){
+           vec4 isect = getIntersection(eye, ray);
+           if(isect.x != NO_HIT){
+               vec3 matColor = WHITE;
+               vec3 normal = isect.yzw;
+               vec3 intersection = eye + isect.x * ray;
+               if(g_objId == 0){
+                   matColor = calcTilingColor(LIGHT_GRAY, intersection.xz, g_texTranslate, g_texSize);
+               }else if(g_objId == 1){
+                   vec2 p = reverseStereoProject(intersection.xzy);
+                   matColor = calcTilingColor(LIGHT_GRAY, p, g_texTranslate, g_texSize);
+               }
+               // diffuse lighting by directionalLight
+               //vec3 diffuse = clamp(dot(normal, LIGHT_DIR), 0., 1.) * matColor;
+       	       vec3 diffuse = diffuseLighting(intersection, normal, matColor,
+                                              LIGHT_POS, LIGHT_POWER);
+               vec3 ambient = matColor * AMBIENT_FACTOR;
+	       if(g_mtl == MTL_TRANSPARENT){
+		   coeff *= TRANSPARENCY;
+		   l += (diffuse + ambient) * coeff;
+		   eye = intersection + ray * 0.01;
+		   continue;
+	       }else{
+		   l += (diffuse + ambient) * coeff;
+	       }
+           }
+           break;
+       }
+       return l;
+   }
+
+   vec3 calcRay (const vec3 eye, const vec3 target,
+		                       const vec3 up, const float fov,
+		                                            const float width, const float height, const vec2 coord){
+       float imagePlane = (height * .5) / tan(radians(fov) * .5);
+       vec3 v = normalize(target - eye);
+       vec3 focalXAxis = normalize(cross(v, up));
+       vec3 focalYAxis =  normalize(cross(v, focalXAxis ));
+       vec3 center = v * imagePlane;
+       vec3 origin = center - (focalXAxis * (width  * .5)) - (focalYAxis * (height * .5));
+       return normalize(origin + (focalXAxis * coord.x) + (focalYAxis * (height - coord.y)));
+   }
+
+   const float SAMPLE_NUM = 5.;
+   void main(){
+       float ratio = u_iResolution.x / u_iResolution.y / 2.0;
+
+       // 2223 tiling or 3333 tiling
+       float x = 0.57735;
+       float y = .57735;
+       float bendX = u_tilt.x;
+       mat3 xRotate = mat3(1, 0, 0,
+                           0, cos(bendX), -sin(bendX),
+                           0, sin(bendX), cos(bendX));
+       float bendY = u_tilt.y;
+       mat3 yRotate = mat3(cos(bendY), 0, sin(bendY),
+                           0, 1, 0,
+                          -sin(bendY), 0, cos(bendY));
+       g_circle1 = getCircleFromSphere(xRotate * vec3(0, y, sqrt(1. - y * y)),
+                                       xRotate * vec3(0, y, -sqrt(1. - y * y)));
+       g_circle2 = getCircleFromSphere(yRotate * vec3(x, 0, sqrt(1. - x * x)),
+                                       yRotate * vec3(x, 0, -sqrt(1. - x * x)));
+
+       if(y > g_circle1.y){
+	   g_revCircle = true;
+       }
+       if(x > g_circle2.x){
+	   g_revCircle2 = true;
+       }
+
+       vec4 intersection = circleIntersection(g_circle1, g_circle2);
+       vec2 p1 = intersection.xy;
+       vec2 p2 = intersection.zw;
+
+       vec2 corner = p2;
+
+       if(g_revCircle){
+	   corner = p1;
+       }
+       if(p1.x == NO_ANSWER && p1.y == NO_ANSWER &&
+          p2.x == NO_ANSWER && p2.y == NO_ANSWER){
+           p1 = vec2(1.5);
+           corner = vec2(1.5);
+       }
+       g_texTranslate = corner;
+       g_texSize = corner * 2.;
+       vec3 sum = vec3(0);
+       for(float i = 0. ; i < SAMPLE_NUM ; i++){
+           vec2 coordOffset = rand2n(gl_FragCoord.xy, i);
+           const vec3 eye = vec3(.8, 2., .8);
+           const vec3 target = vec3(0);
+           const vec3 up = vec3(0, 1, 0);
+           const float fov = 60.;
+           vec3 ray = calcRay(eye, target, up, fov,
+    		              u_iResolution.x, u_iResolution.y,
+        		      gl_FragCoord.xy + coordOffset);
+
+           sum += calcColor(eye, ray);
        }
        gl_FragColor = vec4(sum/SAMPLE_NUM, 1.);
    }
