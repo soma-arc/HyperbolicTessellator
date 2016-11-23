@@ -1,5 +1,6 @@
 var HyperbolicTessellator = function(){
     this.fragId = 'hyperbolic-tessellator';
+    this.fragId3d = 'hyperbolic-tessellator-3d';
     this.vertId = 'vs';
 
     this.tiltX = 0;
@@ -51,6 +52,8 @@ HyperbolicTessellator.prototype = {
     }
 }
 
+const RENDER_2D = 0;
+const RENDER_3D = 1;
 var RenderCanvas = function(canvasId){
     this.canvasId = canvasId;
     this.canvas = document.getElementById(canvasId);
@@ -76,7 +79,8 @@ var RenderCanvas = function(canvasId){
     // Use this texture while loading video.
     this.dummyTexture = this.createTexture(this.gl, 128, 128);
 
-    this.render = function(){};
+    this.render2d = function(){};
+    this.render3d = function(){};
 
     this.resizeCanvasFullscreen();
 
@@ -84,6 +88,8 @@ var RenderCanvas = function(canvasId){
     this.prevMousePos = [0, 0];
 
     this.isDisplayingInstruction = false;
+
+    this.renderMode = RENDER_2D;
 }
 
 RenderCanvas.prototype = {
@@ -183,6 +189,13 @@ RenderCanvas.prototype = {
     },
     viewInstruction: function(){
 	this.isDisplayingInstruction = true;
+    },
+    render: function(){
+        if(this.renderMode == RENDER_2D){
+            this.render2d();
+        }else if(this.renderMode == RENDER_3D){
+            this.render3d();
+        }
     }
 }
 
@@ -192,7 +205,11 @@ function setupGL(renderCanvas, hyperbolicTessellator){
     attachShader(gl, hyperbolicTessellator.fragId, program, gl.FRAGMENT_SHADER);
     attachShader(gl, hyperbolicTessellator.vertId, program, gl.VERTEX_SHADER);
     program = linkProgram(gl, program);
-    gl.useProgram(program);
+
+    var program3d = gl.createProgram();
+    attachShader(gl, hyperbolicTessellator.fragId3d, program3d, gl.FRAGMENT_SHADER);
+    attachShader(gl, hyperbolicTessellator.vertId, program3d, gl.VERTEX_SHADER);
+    program3d = linkProgram(gl, program3d);
 
     var vAttLocation = gl.getAttribLocation(program, 'a_vert');
     gl.bindBuffer(gl.ARRAY_BUFFER, renderCanvas.vertexBuffer);
@@ -203,7 +220,8 @@ function setupGL(renderCanvas, hyperbolicTessellator){
     renderCanvas.setUniformLocation(uniLocation, gl, program);
     hyperbolicTessellator.setUniformLocation(uniLocation, gl, program);
 
-    renderCanvas.render = function(){
+    renderCanvas.render2d = function(){
+        gl.useProgram(program);
         gl.viewport(0, 0,
                     renderCanvas.canvas.width,
                     renderCanvas.canvas.height);
@@ -213,6 +231,26 @@ function setupGL(renderCanvas, hyperbolicTessellator){
                                              renderCanvas.canvas.width,
                                              renderCanvas.canvas.height);
         uniI = hyperbolicTessellator.setUniformValues(uniLocation, gl, uniI);
+
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        gl.flush();
+    }
+
+    var uniLocation3d = [];
+    renderCanvas.setUniformLocation(uniLocation3d, gl, program3d);
+    hyperbolicTessellator.setUniformLocation(uniLocation3d, gl, program3d);
+
+    renderCanvas.render3d = function(){
+        gl.useProgram(program3d);
+        gl.viewport(0, 0,
+                    renderCanvas.canvas.width,
+                    renderCanvas.canvas.height);
+
+        var uniI = 0;
+        uniI = renderCanvas.setUniformValues(uniLocation3d, gl, uniI,
+                                             renderCanvas.canvas.width,
+                                             renderCanvas.canvas.height);
+        uniI = hyperbolicTessellator.setUniformValues(uniLocation3d, gl, uniI);
 
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         gl.flush();
@@ -279,6 +317,7 @@ window.addEventListener('load', function(event){
     f2.addColor(hyperbolicTessellator, 'outerHsvColor1');
     f2.addColor(hyperbolicTessellator, 'outerHsvColor2');
     var f3 = gui.addFolder('Others');
+    f3.add(renderCanvas, 'renderMode', { "2D" : RENDER_2D, "3D" : RENDER_3D });
     f3.add(renderCanvas, 'saveImage');
     f3.add(renderCanvas, 'viewSource');
 
