@@ -235,9 +235,9 @@ window.addEventListener('load', function(event){
         event.preventDefault();
     });
 
-    renderCanvas.canvas.addEventListener('mousewheel', function(event){
+    renderCanvas.canvas.addEventListener('wheel', function(event){
 	event.preventDefault();
-	if(event.wheelDelta > 0){
+	if(event.deltaY < 0){
             renderCanvas.scale *= 0.75;
 	}else{
             renderCanvas.scale *= 1.5;
@@ -258,7 +258,7 @@ window.addEventListener('load', function(event){
     renderCanvas.canvas.addEventListener('mousemove', function(event){
 	if(!renderCanvas.isMousePressing) return;
 	var mouse = renderCanvas.calcPixel(event.clientX, event.clientY);
-	if(event.button == 2){
+	if(event.buttons == 2){
             renderCanvas.translate[0] -= mouse[0] - renderCanvas.prevMousePos[0];
             renderCanvas.translate[1] -= mouse[1] - renderCanvas.prevMousePos[1];
         }
