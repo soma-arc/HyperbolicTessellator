@@ -11,9 +11,9 @@ var HyperbolicTessellator = function(){
     this.displayOuter = false;
     this.hueStep = 0;
     this.hsvColor1 = { h: 0, s: 1, v: 1 };
-    this.hsvColor2 = { h: 250, s: 1, v: 1 };
-    this.outerHsvColor1 = { h: 180, s: 1, v: 1 };
-    this.outerHsvColor2 = { h: 324, s: 1, v: 1 };
+    this.hsvColor2 = { h: 180, s: 1, v: 1 };
+    this.outerHsvColor1 = { h: 90, s: 1, v: 1 };
+    this.outerHsvColor2 = { h: 270, s: 1, v: 1 };
 }
 
 HyperbolicTessellator.prototype = {
@@ -67,7 +67,6 @@ var RenderCanvas = function(canvasId){
     ];
     this.vertexBuffer = createVbo(this.gl, vertex);
 
-
     this.scale = 2.;
     this.translate = [0, 0];
 
@@ -81,6 +80,8 @@ var RenderCanvas = function(canvasId){
 
     this.render2d = function(){};
     this.render3d = function(){};
+
+    this.camera = new Camera([0, 0.5, 0], 60, 2, [0, 1, 0]);
 
     this.resizeCanvasFullscreen();
 
@@ -122,7 +123,7 @@ RenderCanvas.prototype = {
                                                                        renderCanvas.video.videoWidth,
                                                                        renderCanvas.video.videoHeight);
                 renderCanvas.canPlayVideo = true;
-	    }
+	    }//
 	    renderCanvas.video.addEventListener('canplay', canplayListener, false);
             renderCanvas.video.play();
 	}
@@ -199,6 +200,70 @@ RenderCanvas.prototype = {
     }
 }
 
+var Camera = function(target, fovDegree, eyeDist, up){
+    this.target = target;
+    this.prevTarget = target;
+    this.fovDegree = fovDegree;
+    this.eyeDist = eyeDist;
+    this.up = up;
+    this.theta = 0;
+    this.phi = 0;
+    this.position;
+    this.update();
+
+    this.prevTarget;
+}
+
+// Camera is on the sphere which its center is target and radius is eyeDist.
+// Position is defined by two angle, theta and phi.
+Camera.prototype = {
+    update: function(){
+	this.position = [this.eyeDist * Math.cos(this.phi) * Math.cos(this.theta),
+			 this.eyeDist * Math.sin(this.phi),
+			 -this.eyeDist * Math.cos(this.phi) * Math.sin(this.theta)];
+	this.position = [this.target[0] + this.position[0],
+                         this.target[1] + this.position[1],
+                         this.target[2] + this.position[2]];
+	if(Math.abs(this.phi) % (2 * Math.PI) > Math.PI / 2. &&
+	   Math.abs(this.phi) % (2 * Math.PI) < 3 * Math.PI / 2.){
+	    this.up = [0, -1, 0];
+	}else{
+	    this.up = [0, 1, 0];
+	}
+    },
+    setUniformLocation: function(uniLocation, gl, program){
+        uniLocation.push(gl.getUniformLocation(program, 'u_camera'));
+    },
+    setUniformValues: function(uniLocation, gl, uniI){
+        gl.uniform3fv(uniLocation[uniI++],
+                      this.position.concat(this.target,
+                                           this.up,
+                                           [this.fovDegree, 0, 0]));
+        return uniI;
+    },
+    mouseDown: function(event){
+        if(event.buttons == 4){
+            this.prevTheta = this.theta;
+            this.prevPhi = this.phi;
+        }
+    },
+    mouseWheel: function(event){
+        if(event.deltaY < 0){
+            this.eyeDist *= 0.75;
+	}else{
+            this.eyeDist *= 1.5;
+	}
+        this.update();
+    },
+    mouseMove: function(event, mousePos, prevMousePos){
+        if(event.buttons == 4){
+            this.theta = this.prevTheta + (prevMousePos[0] - mousePos[0]);
+            this.phi = this.prevPhi + (prevMousePos[1] - mousePos[1]);
+            this.update();
+        }
+    }
+}
+
 function setupGL(renderCanvas, hyperbolicTessellator){
     var gl = renderCanvas.gl;
     var program = gl.createProgram();
@@ -238,6 +303,7 @@ function setupGL(renderCanvas, hyperbolicTessellator){
 
     var uniLocation3d = [];
     renderCanvas.setUniformLocation(uniLocation3d, gl, program3d);
+    renderCanvas.camera.setUniformLocation(uniLocation3d, gl, program3d);
     hyperbolicTessellator.setUniformLocation(uniLocation3d, gl, program3d);
 
     renderCanvas.render3d = function(){
@@ -250,6 +316,7 @@ function setupGL(renderCanvas, hyperbolicTessellator){
         uniI = renderCanvas.setUniformValues(uniLocation3d, gl, uniI,
                                              renderCanvas.canvas.width,
                                              renderCanvas.canvas.height);
+        uniI = renderCanvas.camera.setUniformValues(uniLocation3d, gl, uniI);
         uniI = hyperbolicTessellator.setUniformValues(uniLocation3d, gl, uniI);
 
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -275,11 +342,15 @@ window.addEventListener('load', function(event){
 
     renderCanvas.canvas.addEventListener('wheel', function(event){
 	event.preventDefault();
-	if(event.deltaY < 0){
-            renderCanvas.scale *= 0.75;
-	}else{
-            renderCanvas.scale *= 1.5;
-	}
+        if(renderCanvas.renderMode == RENDER_2D){
+	    if(event.deltaY < 0){
+                renderCanvas.scale *= 0.75;
+	    }else{
+                renderCanvas.scale *= 1.5;
+	    }
+        }else if(renderCanvas.renderMode == RENDER_3D){
+            renderCanvas.camera.mouseWheel(event);
+        }
     });
 
     renderCanvas.canvas.addEventListener('mouseup', function(event){
@@ -291,14 +362,21 @@ window.addEventListener('load', function(event){
 	var mouse = renderCanvas.calcPixel(event.clientX, event.clientY);
         renderCanvas.prevMousePos = mouse;
 	renderCanvas.isMousePressing = true;
+        if(renderCanvas.renderMode == RENDER_3D)
+            renderCanvas.camera.mouseDown(event);
     });
 
     renderCanvas.canvas.addEventListener('mousemove', function(event){
 	if(!renderCanvas.isMousePressing) return;
 	var mouse = renderCanvas.calcPixel(event.clientX, event.clientY);
-	if(event.buttons == 2){
-            renderCanvas.translate[0] -= mouse[0] - renderCanvas.prevMousePos[0];
-            renderCanvas.translate[1] -= mouse[1] - renderCanvas.prevMousePos[1];
+        if(renderCanvas.renderMode == RENDER_2D){
+	    if(event.buttons == 2){
+                // right click
+                renderCanvas.translate[0] -= mouse[0] - renderCanvas.prevMousePos[0];
+                renderCanvas.translate[1] -= mouse[1] - renderCanvas.prevMousePos[1];
+            }
+        }else if(renderCanvas.renderMode == RENDER_3D){
+            renderCanvas.camera.mouseMove(event, mouse, renderCanvas.prevMousePos);
         }
     });
 

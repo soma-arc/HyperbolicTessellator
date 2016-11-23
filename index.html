@@ -337,6 +337,7 @@
    uniform vec3 u_hsvColor2;
    uniform vec3 u_outerHsvColor1;
    uniform vec3 u_outerHsvColor2;
+   uniform vec3 u_camera[4];
 
    vec2 rand2n(vec2 co, float sampleIndex) {
        vec2 seed = co * (sampleIndex + 1.0);
@@ -628,7 +629,7 @@
    const vec3 LIGHT_DIR = normalize(vec3(0.0, 1., 0.5));
    const int MAX_TRACE_DEPTH = 7;
    const float TRANSPARENCY = .8;
-   const vec3 LIGHT_POS = vec3(0, 5, 3);
+   const vec3 LIGHT_POS = vec3(3, 5, 0);
    const vec3 LIGHT_POWER = vec3(300.);
 
    vec3 calcColor(vec3 eye, vec3 ray){
@@ -723,15 +724,11 @@
        vec3 sum = vec3(0);
        for(float i = 0. ; i < SAMPLE_NUM ; i++){
            vec2 coordOffset = rand2n(gl_FragCoord.xy, i);
-           const vec3 eye = vec3(.8, 2., .8);
-           const vec3 target = vec3(0);
-           const vec3 up = vec3(0, 1, 0);
-           const float fov = 60.;
-           vec3 ray = calcRay(eye, target, up, fov,
+           vec3 ray = calcRay(u_camera[0], u_camera[1], u_camera[2], u_camera[3].x,
     		              u_iResolution.x, u_iResolution.y,
         		      gl_FragCoord.xy + coordOffset);
 
-           sum += calcColor(eye, ray);
+           sum += calcColor(u_camera[0], ray);
        }
        gl_FragColor = vec4(sum/SAMPLE_NUM, 1.);
    }
