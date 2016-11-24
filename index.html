@@ -258,6 +258,13 @@
        }
    }
 
+   const float DISPLAY_GAMMA_COEFF = 1. / 2.2;
+   vec3 gammaCorrect(vec3 rgb) {
+       return vec3((min(pow(rgb.r, DISPLAY_GAMMA_COEFF), 1.)),
+                   (min(pow(rgb.g, DISPLAY_GAMMA_COEFF), 1.)),
+                   (min(pow(rgb.b, DISPLAY_GAMMA_COEFF), 1.)));
+   }
+
    const float SAMPLE_NUM = 10.;
    void main(){
        float ratio = u_iResolution.x / u_iResolution.y / 2.0;
@@ -314,7 +321,7 @@
 
            sum += calcTilingColor(vec3(0), position, texTranslate, texSize);
        }
-       gl_FragColor = vec4(sum/SAMPLE_NUM, 1.);
+       gl_FragColor = vec4(gammaCorrect(sum/SAMPLE_NUM), 1.);
    }
   </script>
   <script id="hyperbolic-tessellator-3d" type="x-shader/x-fragment">
@@ -678,6 +685,14 @@
        return normalize(origin + (focalXAxis * coord.x) + (focalYAxis * (height - coord.y)));
    }
 
+   const float DISPLAY_GAMMA_COEFF = 1. / 2.2;
+   vec3 gammaCorrect(vec3 rgb) {
+       return vec3((min(pow(rgb.r, DISPLAY_GAMMA_COEFF), 1.)),
+                   (min(pow(rgb.g, DISPLAY_GAMMA_COEFF), 1.)),
+                   (min(pow(rgb.b, DISPLAY_GAMMA_COEFF), 1.)));
+   }
+
+
    const float SAMPLE_NUM = 5.;
    void main(){
        float ratio = u_iResolution.x / u_iResolution.y / 2.0;
@@ -730,7 +745,7 @@
 
            sum += calcColor(u_camera[0], ray);
        }
-       gl_FragColor = vec4(sum/SAMPLE_NUM, 1.);
+       gl_FragColor = vec4(gammaCorrect(sum/SAMPLE_NUM), 1.);
    }
   </script>
 </head>
