@@ -113,8 +113,10 @@ RenderCanvas.prototype = {
         var renderCanvas = this;
         var media = {video: true, audio: false};
         var successCallback = function(localMediaStream){
-	    renderCanvas.video = document.createElement('video');
-            renderCanvas.video.src = window.URL.createObjectURL(localMediaStream);
+	        renderCanvas.video = document.createElement('video');
+            // https://stackoverflow.com/questions/27120757/failed-to-execute-createobjecturl-on-url
+            //renderCanvas.video.src = window.URL.createObjectURL(localMediaStream);
+            renderCanvas.video.srcObject = localMediaStream;
             var canplayListener = function(){
                 renderCanvas.video.removeEventListener('canplay', arguments.callee, false);
                 renderCanvas.videoResolution = [renderCanvas.video.videoWidth,
