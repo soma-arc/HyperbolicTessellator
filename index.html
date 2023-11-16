@@ -9,7 +9,12 @@
    }
    canvas {
        cursor: crosshair;
-       background-color: black;
+       position: absolute;
+       top: 0;
+       left: 0;
+   }
+   #stringCanvas {
+       pointer-events: none;
    }
 
    .ui-modal-header-text {
@@ -751,6 +756,7 @@
 </head>
 <body>
     <canvas id="canvas" width="512" height="512"></canvas>
+    <canvas id="stringCanvas"></canvas>
 </body>
         </header>
         <ui-modal :show.sync="renderCanvas.isDisplayingInstruction">

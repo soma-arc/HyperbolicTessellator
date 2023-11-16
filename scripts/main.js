@@ -52,12 +52,39 @@ HyperbolicTessellator.prototype = {
     }
 }
 
+function renderStr(ctx, str) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+    ctx.fillRect(0, 0, this.stringCanvas.width, this.stringCanvas.height);
+    //ctx.textBaseline = 'bottom';
+    //ctx.textAlign = 'center';
+    const font = 'bold 60px serif';
+    ctx.font = font;
+    const metrics = ctx.measureText(str);
+    const fontHeight = metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent;
+    const actualHeight = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+
+    const x = this.stringCanvas.width / 2 - metrics.width / 2;
+    const y = 100;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+    ctx.fillRect(x - 10, y - fontHeight, metrics.width + 10 * 2, fontHeight + 50);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+    ctx.fillText(str, x, y);
+    ctx.fill();
+}
+
 const RENDER_2D = 0;
 const RENDER_3D = 1;
 var RenderCanvas = function(canvasId){
     this.canvasId = canvasId;
     this.canvas = document.getElementById(canvasId);
     this.canvasRatio =  this.canvas.width / this.canvas.height / 2.;
+
+    this.stringCanvas = document.getElementById('stringCanvas');
+    this.strCtx = this.stringCanvas.getContext('2d');
+
     this.gl = this.canvas.getContext('webgl') || this.canvas.getContext('experimental-webgl');
     var vertex = [
             -1, -1,
@@ -101,6 +128,12 @@ RenderCanvas.prototype = {
 	this.canvas.height = window.innerHeight * this.pixelDensity;
 	this.center = [this.canvas.width / 2, this.canvas.height / 2];
 	this.canvasRatio = this.canvas.width / this.canvas.height / 2.;
+
+        this.stringCanvas.style.width = window.innerWidth + 'px';
+        this.stringCanvas.style.height = window.innerHeight + 'px';
+	this.stringCanvas.width = window.innerWidth * this.pixelDensity;
+	this.stringCanvas.height = window.innerHeight * this.pixelDensity;
+        renderStr(this.strCtx, 100);
     },
     calcPixel: function(mx, my){
 	var rect = this.canvas.getBoundingClientRect();
@@ -181,11 +214,12 @@ RenderCanvas.prototype = {
         return uniI;
     },
     saveImage: function(){
-        this.render();
-        var a = document.createElement('a');
-        a.href = this.canvas.toDataURL();
-        a.download = "tessellation.png"
-        a.click();
+        // this.render();
+        // var a = document.createElement('a');
+        // a.href = this.canvas.toDataURL();
+        // a.download = "tessellation.png"
+        // a.click();
+        this.save2d();
     },
     viewSource: function(){
         window.open('https://github.com/soma-arc/HyperbolicTessellator');
@@ -199,6 +233,11 @@ RenderCanvas.prototype = {
         }else if(this.renderMode == RENDER_3D){
             this.render3d();
         }
+    },
+    setTimer5sec() {
+        setTimeout(() => {
+            this.save2d();
+        }, 5000);
     }
 }
 
@@ -266,6 +305,75 @@ Camera.prototype = {
     }
 }
 
+// https://stackoverflow.com/questions/37135417/download-canvas-as-png-in-fabric-js-giving-network-error
+function dataURLtoBlob (dataurl) {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+}
+
+function arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
+}
+
+function saveImage(gl, width, height, filename) {
+    const data = new Uint8Array(width * height * 4);
+    const type = gl.UNSIGNED_BYTE;
+    gl.readPixels(0, 0, width, height, gl.RGBA, type, data);
+
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = width;
+    tmpCanvas.height = height;
+    const context = tmpCanvas.getContext('2d');
+    const imageData = context.createImageData(width, height);
+    imageData.data.set(data);
+    context.putImageData(imageData, 0, 0);
+    // const a = document.createElement('a');
+    // const canvasData =
+    // const blob = dataURLtoBlob(canvasData);
+
+
+    const img = new Image(width, height);
+    img.onload = () => {
+        const saveCanvas = document.createElement('canvas');
+        saveCanvas.width = width;
+        saveCanvas.height = height;
+        const ctx = saveCanvas.getContext('2d');
+        //ctx.scale(1, -1);
+        ctx.setTransform(1,0,0,-1,0,height - 1)
+        ctx.drawImage(img, 0, 0);
+
+        const a = document.createElement('a');
+        a.href = saveCanvas.toDataURL('image/jpeg');
+        a.download = filename;
+        a.click();
+    }
+    img.src = tmpCanvas.toDataURL();
+
+    // const imageData = context.createImageData(width, height);
+    // imageData.data.set(data);
+    // context.putImageData(imageData, 0, 0);
+    // const a = document.createElement('a');
+    // const canvasData = saveCanvas.toDataURL('image/jpeg');
+    // const blob = dataURLtoBlob(canvasData);
+
+    // a.href = URL.createObjectURL(blob);
+    // a.download = filename;
+    // a.click();
+}
+
 function setupGL(renderCanvas, hyperbolicTessellator){
     var gl = renderCanvas.gl;
     var program = gl.createProgram();
@@ -301,6 +409,23 @@ function setupGL(renderCanvas, hyperbolicTessellator){
 
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         gl.flush();
+    }
+
+    renderCanvas.save2d = () => {
+        gl.useProgram(program);
+        gl.viewport(0, 0,
+                    renderCanvas.canvas.width,
+                    renderCanvas.canvas.height);
+
+        var uniI = 0;
+        uniI = renderCanvas.setUniformValues(uniLocation, gl, uniI,
+                                             renderCanvas.canvas.width,
+                                             renderCanvas.canvas.height);
+        uniI = hyperbolicTessellator.setUniformValues(uniLocation, gl, uniI);
+
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        gl.flush();
+        saveImage(gl, renderCanvas.canvas.width, renderCanvas.canvas.height, 'hogehoge.jpeg');
     }
 
     var uniLocation3d = [];
